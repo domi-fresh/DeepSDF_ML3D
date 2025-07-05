@@ -1,13 +1,35 @@
 import torch.nn as nn
+import math
 import torch
 import copy
 from tqdm import tqdm
 from utils import utils_deepsdf
 import numpy as np
 """
-Model based on the paper 'DeepSDF'. 
+Model based on the paper 'SIREN'. 
 """
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+class SineLayer(nn.Module):
+    def __init__(self, in_features, out_features, bias=True, is_first=False, omega_0=30):
+        super().__init__()
+        self.omega_0 = omega_0
+        self.is_first = is_first
+        self.linear = nn.Linear(in_features, out_features, bias=bias)
+        self.init_weights()
+
+    def init_weights(self):
+        with torch.no_grad():
+            if self.is_first:
+                # First laayer initialization
+                self.linear.weight.uniform_(-1 / self.linear.in_features, 1 / self.linear.in_features)
+            else:
+                # Subsequent layers initialization
+                bound = math.sqrt(6/self.linear.in_features) / self.omega_0
+                self.linear.weight.uniform_(-bound, bound)
+
+    def forward(self, input):
+        return torch.sin(self.omega_0 * self.linear(input))
 
 class SDFModel(torch.nn.Module):
     def __init__(self, num_layers, skip_connections, latent_size, inner_dim=512, output_dim=1):
@@ -39,11 +61,11 @@ class SDFModel(torch.nn.Module):
         # Add sequential layers
         layers = []
         for _ in range(num_layers - num_extra_layers):
-            layers.append(nn.Sequential(nn.utils.weight_norm(nn.Linear(input_dim, inner_dim)), nn.ReLU()))
+            layers.append(SineLayer(input_dim, inner_dim, is_first=(len(layers) == 0), omega_0=30))
             input_dim = inner_dim
         self.net = nn.Sequential(*layers)
         self.final_layer = nn.Sequential(nn.Linear(inner_dim, output_dim), nn.Tanh())
-        self.skip_layer = nn.Sequential(nn.Linear(inner_dim, inner_dim - self.skip_tensor_dim), nn.ReLU())
+        self.skip_layer = nn.Sequential(nn.Linear(inner_dim, inner_dim - self.skip_tensor_dim), nn.Identity())
 
 
     def forward(self, x):
