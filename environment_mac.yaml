@@ -1,3 +1,4 @@
+name: deepsdf
 channels:
   - pytorch3d
   - pytorch
@@ -134,12 +135,10 @@ dependencies:
       - markdown==3.4.3
       - oauthlib==3.2.2
       - plotly==5.15.0
-      - git+https://github.com/fwilliams/point-cloud-utils.git
       - portalocker==2.7.0
       - protobuf==4.23.4
       - pyasn1==0.5.0
       - pyasn1-modules==0.3.0
-      - pybullet==3.2.5
       - git+https://github.com/facebookresearch/pytorch3d.git
       - pywavelets==1.4.1
       - pyyaml==6.0

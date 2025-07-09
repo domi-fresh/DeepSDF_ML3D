@@ -14,9 +14,12 @@ class SDFModel(torch.nn.Module):
         """
         SDF model for multiple shapes.
         Args:
-            input_dim: 128 for latent space + 3 points = 131
+            input_dim: 512 for label-based clip embedding + 128 for latent space + 3 points = 646
         """
         super(SDFModel, self).__init__()
+
+        # CLIP Label Embedder dimension
+        self.dim_embedding = 512
 
         # Num layers of the entire network
         self.num_layers = num_layers 
@@ -28,10 +31,10 @@ class SDFModel(torch.nn.Module):
 
         # Dimension of the input space (3D coordinates)
         dim_coords = 3 
-        input_dim = self.latent_size + dim_coords
+        input_dim = self.latent_size + dim_coords + self.dim_embedding
 
         # Copy input size to calculate the skip tensor size
-        self.skip_tensor_dim = copy.copy(input_dim)
+        self.skip_tensor_dim = copy.copy(self.latent_size + dim_coords)
 
         # Compute how many layers are not Sequential
         num_extra_layers = 2 if (self.skip_connections and self.num_layers >= 8) else 1
@@ -50,18 +53,18 @@ class SDFModel(torch.nn.Module):
         """
         Forward pass
         Args:
-            x: input tensor of shape (batch_size, 131). It contains a stacked tensor [latent_code, samples].
+            x: input tensor of shape (batch_size, 512 + 128 + 3). It contains a stacked tensor [class_emb, latent_code, coords].
         Returns:
             sdf: output tensor of shape (batch_size, 1)
         """      
-        input_data = x.clone().detach()
+        input_latent_coords = x[:, self.dim_embedding:].clone().detach() # get latent + coord part of input vector for skip connections
 
         # Forward pass
         if self.skip_connections and self.num_layers >= 5:
             for i in range(3):
                 x = self.net[i](x)
             x = self.skip_layer(x)
-            x = torch.hstack((x, input_data))
+            x = torch.hstack((x, input_latent_coords)) # stack skip layer output with latent code and coord input
             for i in range(self.num_layers - 5):
                 x = self.net[3 + i](x)
             sdf = self.final_layer(x)
@@ -73,25 +76,32 @@ class SDFModel(torch.nn.Module):
         return sdf
 
 
-    def infer_latent_code(self, cfg, pointcloud, sdf_gt, writer, latent_code_initial):
-        """Infer latent code from coordinates, their sdf, and a trained model."""
-
+    def infer_latent_code(self, cfg, pointcloud, sdf_gt, writer, latent_code_initial, class_emb:torch.Tensor):
+        """Infer latent code from coordinates, their sdf, and a trained model.
+        
+        Args:
+            class_emb: input tensor of shape (512,)
+        """
         latent_code = latent_code_initial.clone().detach().requires_grad_(True)
         
         optim = torch.optim.Adam([latent_code], lr=cfg['lr'])
 
         if cfg['lr_scheduler']:
-            scheduler_latent = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, mode='min', 
-                                                    factor=cfg['lr_multiplier'], 
-                                                    patience=cfg['patience'], 
-                                                    threshold=0.001, threshold_mode='rel')
+            scheduler_latent = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optim, 
+                mode='min', 
+                factor=cfg['lr_multiplier'], 
+                patience=cfg['patience'], 
+                threshold=0.001, threshold_mode='rel'
+            )
 
-        best_loss = 1000000
+        best_loss = 1000000 # TODO: torch.inf?
 
         for epoch in tqdm(range(0, cfg['epochs'])):
-
-            latent_code_tile = torch.tile(latent_code, (pointcloud.shape[0], 1))
-            x = torch.hstack((latent_code_tile, pointcloud))
+            
+            n_pts = pointcloud.shape[0]
+            latent_code_tile = torch.tile(latent_code, (n_pts, 1)) # (128,) --> (n_pts, 128) (tile automatically unsqueezes)
+            x = torch.hstack((latent_code_tile, pointcloud, class_emb.tile(n_pts, 1))) # column-wise stacking (n_pts, 128 + 3 + 512)
 
             optim.zero_grad()
 

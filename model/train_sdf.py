@@ -15,6 +15,7 @@ import results
 from torch.utils.tensorboard import SummaryWriter
 import yaml
 import config_files
+from model import clip
 
 # Select device. The 'mps' device (macOS M1 architecture) is not supported as it cannot currently handle weith normalisation. 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -41,6 +42,10 @@ class Trainer():
         # calculate num objects in samples_dictionary, wich is the number of keys
         samples_dict_path = os.path.join(os.path.dirname(results.__file__), f'samples_dict_{train_cfg["dataset"]}.npy')
         samples_dict = np.load(samples_dict_path, allow_pickle=True).item()
+
+        # instantiate clip model for class label embeddings
+        self.clip = clip.ClipObjEmbedder
+        print("Loaded CLIP")
 
         # instantiate model and optimisers
         self.model = sdf_model.SDFModel(
@@ -146,19 +151,21 @@ class Trainer():
         """
         Combine latent code and coordinates.
         Return:
-            - x: latent codes + coordinates, torch tensor shape (batch_size, latent_size + 3)
+            - x: class embedding + latent codes + coordinates, torch tensor shape (batch_size, embedding_size + latent_size + 3)
             - y: ground truth sdf, shape (batch_size, 1)
             - latent_codes_indices_batch: all latent class indices per sample, shape (batch size, 1).
                                             e.g. [[2], [2], [1], ..] eaning the batch contains the 2nd, 2nd, 1st latent code
             - latent_batch_codes: all latent codes per sample, shape (batch_size, latent_size)
         Return ground truth as y, and the latent codes for this batch.
         """
-        latent_classes_batch = batch[0][:, 0].view(-1, 1).to(torch.long)               # shape (batch_size, 1)
-        coords = batch[0][:, 1:]                                  # shape (batch_size, 3)
-        latent_codes_batch = self.latent_codes[latent_classes_batch.view(-1)]    # shape (batch_size, 128)
+        latent_classes_batch = batch[0][:, 0].view(-1, 1).to(torch.long) # shape (batch_size, 1)
+        coords = batch[0][:, 1:] # shape (batch_size, 3)
+        latent_codes_batch = self.latent_codes[latent_classes_batch.view(-1)] # shape (batch_size, 128) # use latent_class 
 
-        x = torch.hstack((latent_codes_batch, coords))                  # shape (batch_size, 131)
-        y = batch[1]     # (batch_size, 1)
+        label_emb_batch = self.clip(batch[2]) # shape (batch_size, 512)
+
+        x = torch.hstack((label_emb_batch, latent_codes_batch, coords)) # shape (batch_size, 131 + 512)
+        y = batch[1] # (batch_size, 1)
 
         return x, y, latent_classes_batch.view(-1), latent_codes_batch
 
