@@ -1,3 +1,28 @@
+# 3DML Course Project mods
+
+### Dataset:
+- ShapeNet (at least 2 new categories besides the ones in the paper)
+- Synthetic Indoor Dataset
+  (https://github.com/autonomousvision/convolutional_occupancy_networks)
+
+### Modifications:
+- Class Embedding (Via PointNet/PointNet++)
+
+- Class-label text conditioning
+
+- Periodic Activation Functions (https://arxiv.org/pdf/2006.09661), checking the effect on thin structures
+
+- Tri-plane features
+
+### Testing
+
+- Provided with similar partial observations from different
+categories, the model should be able to generate shapes that align well with
+observations while keeping class-specific properties, and the shape
+interpolation should show gradual changes of shapes in-between categories.
+
+- Compare Shape completion on unseen class, with/without class embedding
+
 # DeepSDF
 Implementation of the paper [DeepSDF: Learning Continuous Signed Distance Functions for Shape Representation](https://openaccess.thecvf.com/content_CVPR_2019/html/Park_DeepSDF_Learning_Continuous_Signed_Distance_Functions_for_Shape_Representation_CVPR_2019_paper.html). The goal if this repository is to provide a simple and intuitive implementation of the DeepSDF model that can be installed with just a single line of code. Step-to-step instructions on data extraction, training, reconstruction and shape completion are provided. Please note: this is not the official implementation. For the official implementation and citation guidelines, please refer to the [original repository](https://github.com/facebookresearch/DeepSDF).
 

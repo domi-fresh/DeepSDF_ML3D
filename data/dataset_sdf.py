@@ -35,3 +35,4 @@ class SDFDataset(Dataset):
 if __name__=='__main__':
     dataset_name = "ShapeNetCore"
     dataset = SDFDataset(dataset_name)
+    print(dataset)

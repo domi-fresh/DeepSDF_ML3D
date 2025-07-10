@@ -199,7 +199,6 @@ class Trainer():
         total_loss_latent = 0.0
         iterations = 0.0
         self.model.eval()
-
         for batch in val_loader:
             # batch[0]: [class, x, y, z], shape: (batch_size, 4)
             # batch[1]: [sdf], shape: (batch size)

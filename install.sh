@@ -18,11 +18,11 @@ fi
 pip install -e .
 
 # Update the environment
-conda env update -n $env_name --file $ENVIRONMENT_FILE
+#conda env update -n $env_name --file $ENVIRONMENT_FILE
 
 if [[ "$(uname)" == "Linux" ]]; then
     # Install PyTorch
-    conda install pytorch==1.11.0 torchvision==0.12.0 torchaudio==0.11.0 cudatoolkit=11.3 -c pytorch
+    conda install pytorch==1.11.0 torchvision==0.12.0 torchaudio==0.11.0 cudatoolkit=11.6 -c pytorch
     # install Pytorch3D
-    conda install pytorch3d==0.7.4 -c pytorch3d
+    conda install pytorch3d -c pytorch3d
 fi
