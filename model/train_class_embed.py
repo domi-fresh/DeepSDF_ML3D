@@ -16,8 +16,6 @@ from torch.utils.tensorboard import SummaryWriter
 import yaml
 import config_files
 
-from data.dataset_shapenet import ShapeNetSDFDataset
-
 # Select device. The 'mps' device (macOS M1 architecture) is not supported as it cannot currently handle weith normalisation. 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Device: {device}')
@@ -40,42 +38,148 @@ class Trainer():
         with open(self.log_path, 'w') as f:
             yaml.dump(self.train_cfg, f)
 
-        # dataloaders
-        train_loader = DataLoader(
-            ShapeNetSDFDataset("overfit"),
-            batch_size=self.train_cfg["batch_size"],
-            shuffle=True,
-            drop_last=True
-        )
+        # calculate num objects in samples_dictionary, wich is the number of keys
+        samples_dict_path = os.path.join(os.path.dirname(results.__file__), f'samples_dict_{train_cfg["dataset"]}.npy')
+        samples_dict = np.load(samples_dict_path, allow_pickle=True).item()
 
-        val_loader = DataLoader(
-            ShapeNetSDFDataset("val"),
-            batch_size=self.train_cfg["batch_size"],
-            shuffle=False,
-            drop_last=True
-        )
+        # load the classes dict
+        cls_dict_path = os.path.join(os.path.dirname(results.__file__), f'cls_int2str_dict.npy')
+        cls_dict = np.load(cls_dict_path, allow_pickle=True).item()
 
+        latent_size = self.train_cfg['latent_size'] + self.train_cfg["class_embed_size"]
         # instantiate model and optimisers
         self.model = sdf_model.SDFModel(
                 self.train_cfg['num_layers'], 
                 self.train_cfg['skip_connections'], 
                 inner_dim=self.train_cfg['inner_dim'],
-                latent_size=self.train_cfg['latent_size']
+                latent_size=latent_size
             ).float().to(device)
 
         # define optimisers
         self.optimizer_model = optim.Adam(self.model.parameters(), lr=self.train_cfg['lr_model'], weight_decay=0)
         
         # generate a unique random latent code for each shape
-        self.latent_codes = torch.nn.Embedding(len(ShapeNetSDFDataset("train")), self.train_cfg["latent_size"]).float()
-        self.optimizer_latent = optim.Adam(self.latent_codes.parameters(), lr=self.train_cfg['lr_latent'], weight_decay=0)
+        self.latent_codes = utils_deepsdf.generate_latent_codes(self.train_cfg['latent_size'], samples_dict)
+        self.optimizer_latent = optim.Adam([self.latent_codes], lr=self.train_cfg['lr_latent'], weight_decay=0)
+
+        # generate one random class embedding for each class
+        self.cls_embeds = utils_deepsdf.generate_class_embeddings(self.train_cfg['class_embed_size'], cls_dict)
+        self.optimizer_embeds = optim.Adam([self.cls_embeds], lr=self.train_cfg['lr_latent'], weight_decay=0)
         
+        # Load pretrained weights and optimisers to continue training
+        if self.train_cfg['pretrained']:
+            # load pretrained weights
+            self.model.load_state_dict(torch.load(self.train_cfg['pretrain_weights'], map_location=device))
+
+            # load pretrained optimisers
+            self.optimizer_model.load_state_dict(torch.load(self.train_cfg['pretrain_optim_model'], map_location=device))
+
+            # retrieve latent codes from results.npy file
+            results_path = self.train_cfg['pretrain_optim_model'].split(os.sep)
+            results_path[-1] = 'results.npy'
+            results_path = os.sep.join(results_path)
+
+            # TODO: load class embeddings
+
+            # load latent codes from results.npy file
+            results_latent_codes = np.load(results_path, allow_pickle=True).item()
+            self.latent_codes = torch.tensor(results_latent_codes['best_latent_codes']).float().to(device)
+            self.optimizer_latent = optim.Adam([self.latent_codes], lr=self.train_cfg['lr_latent'], weight_decay=0)
+            self.optimizer_latent.load_state_dict(torch.load(self.train_cfg['pretrain_optim_latent'], map_location=device))
+
+        if self.train_cfg['lr_scheduler']:
+            self.scheduler_model =  torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer_model, mode='min', factor=self.train_cfg['lr_multiplier'], patience=self.train_cfg['patience'], threshold=0.0001, threshold_mode='rel')
+            self.scheduler_latent =  torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer_latent, mode='min', factor=self.train_cfg['lr_multiplier'], patience=self.train_cfg['patience'], threshold=0.0001, threshold_mode='rel')
+            
+        # get data
+        train_loader, val_loader = self.get_loaders()
+        self.results = {
+            'best_latent_codes' : [],
+            'best_class_embeds' : []
+        }
+
+        best_loss = 10000000000
+        start = time.time()
         for epoch in range(self.train_cfg['epochs']):
             print(f'============================ Epoch {epoch} ============================')
             self.epoch = epoch
-            avg_train_loss = self.train(train_loader, self.latent_codes)
 
-    def train(self, train_loader, latent_codes):
+            avg_train_loss = self.train(train_loader)
+
+            with torch.no_grad():
+                avg_val_loss = self.validate(val_loader)
+
+                if avg_val_loss < best_loss:
+                    best_loss = np.copy(avg_val_loss)
+                    best_weights = self.model.state_dict()
+                    best_latent_codes = self.latent_codes.detach().cpu().numpy()
+                    best_class_embeds = self.cls_embeds.detach().cpu().numpy()
+                    optimizer_model_state = self.optimizer_model.state_dict()
+                    optimizer_latent_state = self.optimizer_latent.state_dict()
+
+                    np.save(os.path.join(self.run_dir, 'results.npy'), self.results)
+                    torch.save(best_weights, os.path.join(self.run_dir, 'weights.pt'))
+                    torch.save(optimizer_model_state, os.path.join(self.run_dir, 'optimizer_model_state.pt'))
+                    torch.save(optimizer_latent_state, os.path.join(self.run_dir, 'optimizer_latent_state.pt'))
+                    self.results['best_latent_codes'] = best_latent_codes
+                    self.results['best_class_embeds'] = best_class_embeds
+
+                if self.train_cfg['lr_scheduler']:
+                    self.scheduler_model.step(avg_val_loss)
+                    self.scheduler_latent.step(avg_val_loss)
+
+                    self.writer.add_scalar('Learning rate (model)', self.scheduler_model._last_lr[0], epoch)
+                    self.writer.add_scalar('Learning rate (latent)', self.scheduler_latent._last_lr[0], epoch)            
+            
+        end = time.time()
+        print(f'Time elapsed: {end - start} s')
+
+    def get_loaders(self):
+        data = dataset.SDFDataset(self.train_cfg['dataset'])
+
+        if self.train_cfg['clamp']:
+            data.data['sdf'] = torch.clamp(data.data['sdf'], -self.train_cfg['clamp_value'], self.train_cfg['clamp_value'])
+
+        train_size = int(0.85 * len(data))
+        val_size = len(data) - train_size
+        train_data, val_data = random_split(data, [train_size, val_size])
+        train_loader = DataLoader(
+                train_data,
+                batch_size=self.train_cfg['batch_size'],
+                shuffle=True,
+                drop_last=True
+            )
+        val_loader = DataLoader(
+            val_data,
+            batch_size=self.train_cfg['batch_size'],
+            shuffle=False,
+            drop_last=True
+            )
+        return train_loader, val_loader
+
+    def generate_xy(self, batch):
+        """
+        Combine latent code and coordinates.
+        Return:
+            - x: latent codes + coordinates, torch tensor shape (batch_size, latent_size + 3)
+            - y: ground truth sdf, shape (batch_size, 1)
+            - latent_codes_indices_batch: all latent class indices per sample, shape (batch size, 1).
+                                            e.g. [[2], [2], [1], ..] eaning the batch contains the 2nd, 2nd, 1st latent code
+            - latent_batch_codes: all latent codes per sample, shape (batch_size, latent_size)
+        Return ground truth as y, and the latent codes for this batch.
+        """
+        classes_batch = batch[0][:, 0].view(-1, 1).to(torch.long)
+        latent_classes_batch = batch[0][:, 1].view(-1, 1).to(torch.long)               # shape (batch_size, 1)
+        coords = batch[0][:, 2:]                                  # shape (batch_size, 3)
+        latent_codes_batch = self.latent_codes[latent_classes_batch.view(-1)]    # shape (batch_size, 128)
+        class_embeds_batch = self.cls_embeds[classes_batch.view(-1)]
+
+        x = torch.hstack((class_embeds_batch, latent_codes_batch, coords))                  # shape (batch_size, 131)
+        y = batch[1]     # (batch_size, 1)
+
+        return x, y, latent_classes_batch.view(-1), latent_codes_batch, classes_batch.view(-1), class_embeds_batch
+
+    def train(self, train_loader):
         total_loss = 0.0
         iterations = 0.0
         self.model.train()
@@ -86,27 +190,22 @@ class Trainer():
 
             self.optimizer_model.zero_grad()
             self.optimizer_latent.zero_grad()
+            self.optimizer_embeds.zero_grad()
 
-            latent_code = latent_codes(batch['indices']).unsqueeze(1).expand(-1, batch['points'].shape[1], -1).float()
-            latent_code = torch.flatten(latent_code, end_dim=1)
-            latent_code = latent_code.to(device)
-            points = batch["points"].float()
-            points = torch.flatten(points, end_dim=1)
-            points = points.to(device)
-            y = batch["sdf"].float()
-            y = torch.flatten(y, end_dim=1)
-            y = y.to(device)
+            x, y, _, _, _, _ = self.generate_xy(batch)
 
-            x = torch.concat((latent_code, points), dim=1)
             predictions = self.model(x)  # (batch_size, 1)
             if self.train_cfg['clamp']:
                 predictions = torch.clamp(predictions, -self.train_cfg['clamp_value'], self.train_cfg['clamp_value'])
             
-            loss_value, loss_rec, loss_latent = self.train_cfg['loss_multiplier'] * SDFLoss_multishape(y, predictions, x[:, :self.train_cfg['latent_size']], sigma=self.train_cfg['sigma_regulariser'])
+            loss_value, loss_rec, loss_latent = self.train_cfg['loss_multiplier'] * SDFLoss_multishape(y, predictions, 
+                                                                                                       x[:, :(self.train_cfg['latent_size'] + self.train_cfg['class_embed_size'])], 
+                                                                                                       sigma=self.train_cfg['sigma_regulariser'])
             loss_value.backward()       
 
             self.optimizer_latent.step()
             self.optimizer_model.step()
+            self.optimizer_embeds.zero_grad()
             total_loss += loss_value.data.cpu().numpy()  
 
         avg_train_loss = total_loss/iterations
@@ -115,25 +214,26 @@ class Trainer():
 
         return avg_train_loss
 
-    def validate(self, val_loader, latent_codes):
+    def validate(self, val_loader):
         total_loss = 0.0
         total_loss_rec = 0.0
         total_loss_latent = 0.0
         iterations = 0.0
         self.model.eval()
-
         for batch in val_loader:
             # batch[0]: [class, x, y, z], shape: (batch_size, 4)
             # batch[1]: [sdf], shape: (batch size)
             iterations += 1.0            
 
-            x, y, _, latent_codes_batch = self.generate_xy(batch)
+            x, y, _, latent_codes_batch, _, class_embeds_batch = self.generate_xy(batch)
+
+            latent_vect = torch.hstack((class_embeds_batch,latent_codes_batch))
 
             predictions = self.model(x)  # (batch_size, 1)
             if train_cfg['clamp']:
                 predictions = torch.clamp(predictions, -train_cfg['clamp_value'], train_cfg['clamp_value'])
 
-            loss_value, loss_rec, loss_latent = self.train_cfg['loss_multiplier'] * SDFLoss_multishape(y, predictions, latent_codes_batch, self.train_cfg['sigma_regulariser'])          
+            loss_value, loss_rec, loss_latent = self.train_cfg['loss_multiplier'] * SDFLoss_multishape(y, predictions, latent_vect, self.train_cfg['sigma_regulariser'])          
             total_loss += loss_value.data.cpu().numpy()   
             total_loss_rec += loss_rec.data.cpu().numpy() 
             total_loss_latent += loss_latent.data.cpu().numpy()

@@ -47,6 +47,19 @@ def generate_latent_codes(latent_size, samples_dict):
     latent_codes.requires_grad_(True)
     return latent_codes #, dict_latent_codes
 
+def generate_class_embeddings(cls_embed_size, cls_dict):
+    """Generate a random class embedding for each class form a Gaussian distribution
+    Returns:
+        - cls_embeds: np.array, shape (num_shapes, latent_size)
+    """
+    cls_embeds = torch.tensor([], dtype=torch.float32).reshape(0, cls_embed_size).to(device)
+    #dict_latent_codes = dict()
+    for i, obj_idx in enumerate(list(cls_dict.keys())):
+        #dict_latent_codes[obj_idx] = i
+        cls_embed = torch.normal(0, 0.01, size = (1, cls_embed_size), dtype=torch.float32).to(device)
+        cls_embeds = torch.vstack((cls_embeds, cls_embed))
+    cls_embeds.requires_grad_(True)
+    return cls_embeds #, dict_latent_codes
 
 def get_volume_coords(resolution = 50):
     """Get 3-dimensional vector (M, N, P) according to the desired resolutions."""
