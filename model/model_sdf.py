@@ -65,7 +65,9 @@ class SDFModel(torch.nn.Module):
             input_dim = inner_dim
         self.net = nn.Sequential(*layers)
         self.final_layer = nn.Sequential(nn.Linear(inner_dim, output_dim))
-        self.skip_layer = nn.Sequential(nn.Linear(inner_dim, inner_dim - self.skip_tensor_dim), nn.Identity())
+        skip_output_dim = max(1, inner_dim - self.skip_tensor_dim)
+        self.skip_layer = nn.Linear(inner_dim, skip_output_dim)
+
 
 
     def forward(self, x):

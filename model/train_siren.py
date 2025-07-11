@@ -43,7 +43,7 @@ class Trainer():
         samples_dict = np.load(samples_dict_path, allow_pickle=True).item()
 
         # instantiate model and optimisers
-        self.model = siren_model.SineLayer(
+        self.model = siren_model.SDFModel(
                 self.train_cfg['num_layers'], 
                 self.train_cfg['skip_connections'], 
                 inner_dim=self.train_cfg['inner_dim'],
@@ -227,7 +227,7 @@ class Trainer():
         return avg_val_loss
 
 if __name__=='__main__':
-    train_cfg_path = os.path.join(os.path.dirname(config_files.__file__), 'train_sdf.yaml')
+    train_cfg_path = os.path.join(os.path.dirname(config_files.__file__), 'train_siren.yaml')
     with open(train_cfg_path, 'rb') as f:
         train_cfg = yaml.load(f, Loader=yaml.FullLoader)
 
