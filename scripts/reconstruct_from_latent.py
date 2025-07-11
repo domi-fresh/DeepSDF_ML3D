@@ -48,7 +48,7 @@ def main(cfg):
     training_settings = read_params(cfg)
 
     # Load the model
-    weights = os.path.join(os.path.dirname(runs_sdf.__file__), cfg['folder_sdf'], 'weights.pt')
+    weights = os.path.join("results/runs_sdf", cfg['folder_sdf'], 'weights.pt')
 
     model = sdf_model.SDFModel(
         num_layers=training_settings['num_layers'], 
@@ -66,7 +66,7 @@ def main(cfg):
     
     # Load paths
     str2int_path = os.path.join(os.path.dirname(results.__file__), 'idx_str2int_dict.npy')
-    results_dict_path = os.path.join(os.path.dirname(runs_sdf.__file__), cfg['folder_sdf'], 'results.npy')
+    results_dict_path = os.path.join("results/runs_sdf", cfg['folder_sdf'], 'results.npy')
     
     # Load dictionaries
     str2int_dict = np.load(str2int_path, allow_pickle=True).item()
