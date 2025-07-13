@@ -7,7 +7,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # mp.offline()
 
-def clamp(x, delta=torch.tensor([[0.1]]).to(device)):
+def clamp(x, delta=torch.tensor(0.1).to(device)):
     """Clamp function introduced in the paper DeepSDF.
     This returns a value in range [-delta, delta]. If x is within this range, it returns x, else one of the extremes.
 
@@ -15,9 +15,7 @@ def clamp(x, delta=torch.tensor([[0.1]]).to(device)):
         x: prediction, torch tensor (batch_size, 1)
         delta: small value to control the distance from the surface over which we want to mantain metric SDF
     """
-    maximum = torch.amax(torch.vstack((x, -delta)))
-    minimum = torch.amin(torch.vstack((delta[0], maximum)))
-    return minimum
+    return torch.clamp(x, -delta, delta)
 
 
 def SDFLoss_multishape(sdf, prediction, x_latent, sigma):
