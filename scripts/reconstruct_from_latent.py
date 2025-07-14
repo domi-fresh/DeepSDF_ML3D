@@ -16,8 +16,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def read_params(cfg):
     """Read the settings from the settings.yaml file. These are the settings used during training."""
-    runs_sdf_dir = os.path.abspath('/cluster/51/jgabe/DeepSDF_ML3D/results/runs_sdf')
-    training_settings_path = os.path.join(runs_sdf_dir, cfg['folder_sdf'], 'settings.yaml')
+    training_settings_path = os.path.join(os.path.dirname(runs_sdf.__file__),  cfg['folder_sdf'], 'settings.yaml') 
     with open(training_settings_path, 'rb') as f:
         training_settings = yaml.load(f, Loader=yaml.FullLoader)
 
