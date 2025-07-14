@@ -15,6 +15,7 @@ import results
 from torch.utils.tensorboard import SummaryWriter
 import yaml
 import config_files
+import os
 
 # Select device. The 'mps' device (macOS M1 architecture) is not supported as it cannot currently handle weith normalisation. 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -27,7 +28,7 @@ class Trainer():
     def __call__(self):
         # directories
         self.timestamp_run = datetime.now().strftime('%d_%m_%H%M%S')   # timestamp to use for logging data
-        self.runs_dir = os.path.dirname(runs.__file__)               # directory fo all runs
+        self.runs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'results'))             # directory fo all runs
         self.run_dir = os.path.join(self.runs_dir, self.timestamp_run)  # directory for this run
         if not os.path.exists(self.run_dir):
             os.makedirs(self.run_dir)
