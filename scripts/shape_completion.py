@@ -3,7 +3,6 @@ import os
 import model.model_sdf as sdf_model
 from utils import utils_deepsdf
 import trimesh
-from results import runs_sdf
 import numpy as np
 import config_files
 import yaml
@@ -20,7 +19,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def read_params(cfg):
     """Read the settings from the settings.yaml file. These are the settings used during training."""
-    training_settings_path = os.path.join(os.path.dirname(runs_sdf.__file__),  cfg['folder_sdf'], 'settings.yaml') 
+    runs_sdf_dir = os.path.abspath("results/runs_sdf")
+    training_settings_path = os.path.join(runs_sdf_dir, cfg['folder_sdf'], 'settings.yaml')
     with open(training_settings_path, 'rb') as f:
         training_settings = yaml.load(f, Loader=yaml.FullLoader)
 

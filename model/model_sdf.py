@@ -5,6 +5,7 @@ import copy
 from tqdm import tqdm
 from utils import utils_deepsdf
 import numpy as np
+from torch.nn.utils import weight_norm
 """
 Model based on the paper 'SIREN'. 
 """
@@ -15,18 +16,19 @@ class SineLayer(nn.Module):
         super().__init__()
         self.omega_0 = omega_0 if is_first else 1
         self.is_first = is_first
-        self.linear = nn.Linear(in_features, out_features, bias=bias)
+        linear = nn.Linear(in_features, out_features, bias=bias)
+        self.linear = weight_norm(linear)
         self.init_weights()
 
     def init_weights(self):
         with torch.no_grad():
             if self.is_first:
                 # First laayer initialization
-                self.linear.weight.uniform_(-1 / self.linear.in_features, 1 / self.linear.in_features)
+                self.linear.weight_v.uniform_(-1 / self.linear.in_features, 1 / self.linear.in_features)
             else:
                 # Subsequent layers initialization
                 bound = math.sqrt(6/self.linear.in_features) / self.omega_0
-                self.linear.weight.uniform_(-bound, bound)
+                self.linear.weight_v.uniform_(-bound, bound)
 
     def forward(self, input):
         return torch.sin(self.omega_0 * self.linear(input))
@@ -64,7 +66,7 @@ class SDFModel(torch.nn.Module):
             layers.append(SineLayer(input_dim, inner_dim, is_first=(len(layers) == 0), omega_0=30))
             input_dim = inner_dim
         self.net = nn.Sequential(*layers)
-        self.final_layer = nn.Sequential(nn.Linear(inner_dim, output_dim))
+        self.final_layer = nn.Sequential(weight_norm(nn.Linear(inner_dim, output_dim)))
         skip_output_dim = max(1, inner_dim - self.skip_tensor_dim)
         self.skip_layer = nn.Linear(inner_dim, skip_output_dim)
 
