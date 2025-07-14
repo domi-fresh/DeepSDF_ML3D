@@ -1,6 +1,7 @@
 import torch
 import os
 import model.model_sdf as sdf_model
+from results import runs_sdf
 from utils import utils_deepsdf
 import trimesh
 import numpy as np
@@ -42,7 +43,7 @@ def reconstruct_object(cfg, latent_code, obj_idx, model, coords_batches, grad_si
         return
     
     # save mesh as obj
-    mesh_dir = os.path.join(os.path.dirname(runs_sdf.__file__), cfg['folder_sdf'], 'meshes_training')
+    mesh_dir = os.path.join(os.path.dirname("results/runs_sdf"), cfg['folder_sdf'], 'meshes_training')
     if not os.path.exists(mesh_dir):
         os.mkdir(mesh_dir)
     obj_path = os.path.join(mesh_dir, f"mesh_{obj_idx}.obj")
