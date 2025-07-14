@@ -15,11 +15,12 @@ from torch.utils.tensorboard import SummaryWriter
 Store the mesh in the same folder where the latent code is located."""
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+runs_sdf_dir = os.path.abspath("results/runs_sdf")
+
 
 
 def read_params(cfg):
     """Read the settings from the settings.yaml file. These are the settings used during training."""
-    runs_sdf_dir = os.path.abspath("results/runs_sdf")
     training_settings_path = os.path.join(runs_sdf_dir, cfg['folder_sdf'], 'settings.yaml')
     with open(training_settings_path, 'rb') as f:
         training_settings = yaml.load(f, Loader=yaml.FullLoader)
@@ -83,7 +84,8 @@ def main(cfg):
     model_settings = read_params(cfg)
 
     # Set directory and paths
-    model_dir = os.path.join(os.path.dirname(runs_sdf.__file__), cfg['folder_sdf'])
+    model_dir = os.path.join(runs_sdf_dir, cfg['folder_sdf'])
+
 
     inference_dir = os.path.join(model_dir, f"infer_latent_{datetime.now().strftime('%d_%m_%H%M%S')}")
     if not os.path.exists(inference_dir):
