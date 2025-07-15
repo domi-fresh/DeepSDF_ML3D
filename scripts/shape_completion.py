@@ -16,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 Store the mesh in the same folder where the latent code is located."""
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-runs_sdf_dir = os.path.abspath("results/runs_sdf")
+runs_sdf_dir = os.path.abspath("results")
 
 
 
