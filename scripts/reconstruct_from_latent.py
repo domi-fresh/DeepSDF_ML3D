@@ -38,9 +38,10 @@ def reconstruct_object(cfg, latent_code, obj_idx, model, coords_batches, grad_si
         return
     
     # save mesh as obj
-    mesh_dir = os.path.join(os.path.dirname("results/runs_sdf"), cfg['folder_sdf'], 'meshes_training')
-    if not os.path.exists(mesh_dir):
-        os.mkdir(mesh_dir)
+    mesh_dir = os.path.join("results/runs_sdf", cfg['folder_sdf'], 'meshes_training')
+    os.makedirs(mesh_dir, exist_ok=True)
+    # if not os.path.exists(mesh_dir):
+    #    os.mkdir(mesh_dir) 
     obj_path = os.path.join(mesh_dir, f"mesh_{obj_idx}.obj")
     trimesh.exchange.export.export_mesh(trimesh.Trimesh(vertices, faces), obj_path, file_type='obj')
 
