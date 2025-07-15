@@ -38,7 +38,7 @@ def reconstruct_object(cfg, latent_code, obj_idx, model, coords_batches, grad_si
         return
     
     # save mesh as obj
-    mesh_dir = os.path.join("results/runs_sdf", cfg['folder_sdf'], 'meshes_training')
+    mesh_dir = os.path.join("results", cfg['folder_sdf'], 'meshes_training')
     os.makedirs(mesh_dir, exist_ok=True)
     # if not os.path.exists(mesh_dir):
     #    os.mkdir(mesh_dir) 
