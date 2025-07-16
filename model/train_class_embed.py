@@ -147,13 +147,13 @@ class Trainer():
                 train_data,
                 batch_size=self.train_cfg['batch_size'],
                 shuffle=True,
-                drop_last=True
+                drop_last=False
             )
         val_loader = DataLoader(
             val_data,
             batch_size=self.train_cfg['batch_size'],
             shuffle=False,
-            drop_last=True
+            drop_last=False
             )
         return train_loader, val_loader
 

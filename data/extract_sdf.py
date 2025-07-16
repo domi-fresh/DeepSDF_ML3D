@@ -3,7 +3,7 @@ import results
 import os
 from utils import utils_mesh
 import point_cloud_utils as pcu
-import data.ShapeNetCoreV2 as ShapeNetCoreV2
+import data.ShapeNetSofas as ShapeNetCoreV2
 from glob import glob
 from datetime import datetime
 import config_files
@@ -31,6 +31,10 @@ def main(cfg):
   
     # Full paths to all .obj
     obj_paths = glob(os.path.join(os.path.dirname(ShapeNetCoreV2.__file__), '*', '*', 'models', '*.obj'))
+
+    dirname = os.path.dirname(ShapeNetCoreV2.__file__)
+    with open(f"{dirname}/splits/val.txt") as f:
+        obj_paths = [line.strip() for line in f]
 
     # File to store the samples and SDFs
     samples_dict = dict()        

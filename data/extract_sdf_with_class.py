@@ -30,10 +30,15 @@ def combine_sample_latent(samples, latent_class):
 def main(cfg):
   
     # Full paths to all .obj
-    obj_paths = glob(os.path.join(os.path.dirname(ShapeNetCoreV2.__file__), '*', '*', 'models', '*.obj'))
+    #obj_paths = glob(os.path.join(os.path.dirname(ShapeNetCoreV2.__file__), '*', '*', 'models', '*.obj'))
+    dirname = os.path.dirname(ShapeNetCoreV2.__file__)
+    with open(f"{dirname}/splits/train.txt") as f:
+        obj_paths = [line.strip() for line in f]
     
     classes = [dir for dir in os.listdir(os.path.dirname(ShapeNetCoreV2.__file__)) if dir.isdigit()]
     classes = sorted(classes)
+
+    print(f"Classes: {classes}")
 
     # File to store the samples and SDFs
     samples_dict = dict()        
@@ -49,7 +54,11 @@ def main(cfg):
         cls_int2str_dict[cls_idx] = cls_name
         cls_str2int_dict[cls_name] = cls_idx
 
+    extracted = 0
+
     for obj_idx, obj_path in enumerate(obj_paths):
+
+        print(f"Extracting {obj_path}    {extracted}/{len(obj_paths)}")
 
         # Object unique index. Str to int by byte encoding
         obj_idx_str = os.sep.join(obj_path.split(os.sep)[-4:-2]) # e.g. '02958343/1a2b3c4d5e6f7g8h9i0j'
@@ -77,8 +86,9 @@ def main(cfg):
             continue
 
         # In Shapenet, the front is the -Z axis with +Y still being the up axis. Rotate objects to align with the canonical axis. 
-        mesh = utils_mesh.shapenet_rotate(mesh_original)
-        verts = np.array(mesh.vertices)
+        #mesh = utils_mesh.shapenet_rotate(mesh_original)
+        #mesh = mesh_original
+        #verts = np.array(mesh.vertices)
 
         # Generate random points in the predefined volume that surrounds all the shapes.
         # NOTE: ShapeNet shapes are normalized within [-1, 1]^3
@@ -87,6 +97,10 @@ def main(cfg):
         # Sample within the object's bounding box. This ensures a higher ratio between points inside and outside the surface.
         v_min, v_max = verts.min(0), verts.max(0)
         p_bbox = np.random.uniform(low=[v_min[0], v_min[1], v_min[2]], high=[v_max[0], v_max[1], v_max[2]], size=(cfg['num_samples_in_bbox'], 3))
+
+        if faces.min() < 0 or faces.max() >= verts.shape[0]:
+            print(f"Warning: corrupt mesh! skipping object {obj_path}")
+            continue
 
         # Sample points on the surface as face ids and barycentric coordinates
         fid_surf, bc_surf = pcu.sample_mesh_random(verts, faces, cfg['num_samples_on_surface'])
@@ -103,8 +117,10 @@ def main(cfg):
         # The samples are p_total, while the latent class is [obj_idx]
         samples_dict[obj_idx]['samples_latent_class'] = combine_sample_latent(p_total, np.array([obj_idx], dtype=np.int32))
 
-        # The class id
+        # append the class ID to the vector
         samples_dict[obj_idx]['samples_latent_class'] = combine_sample_latent(samples_dict[obj_idx]['samples_latent_class'], np.array([obj_cls_idx], dtype=np.int32))
+
+        extracted += 1
 
     np.save(os.path.join(os.path.dirname(results.__file__), f'samples_dict_{cfg["dataset"]}.npy'), samples_dict)
 
