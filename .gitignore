@@ -10,3 +10,8 @@ __pycache__/
 .DS_Store
 deepsdf.egg-info
 jobs/
+data/*
+!data/__init__.py
+!data/dataset_sdf.py
+!data/extract_sdf.py
+!data/extract_sdf_parallel.py

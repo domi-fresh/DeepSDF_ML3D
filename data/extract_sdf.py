@@ -40,7 +40,7 @@ def main(cfg):
     idx_int2str_dict = dict()
 
     for obj_idx, obj_path in enumerate(obj_paths):
-
+        print(f"Object path: {obj_path}")
         # Object unique index. Str to int by byte encoding
         obj_idx_str = os.sep.join(obj_path.split(os.sep)[-4:-2]) # e.g. '02958343/1a2b3c4d5e6f7g8h9i0j'
         idx_str2int_dict[obj_idx_str] = obj_idx
@@ -57,15 +57,15 @@ def main(cfg):
             
             if not mesh_original.is_watertight:
                 verts, faces = pcu.make_mesh_watertight(mesh_original.vertices, mesh_original.faces, 50000)
-                mesh_original = trimesh.Trimesh(vertices=verts, faces=faces)
+                #mesh_original = trimesh.Trimesh(vertices=verts, faces=faces)
 
         except Exception as e:
             print(e)
             continue
 
         # In Shapenet, the front is the -Z axis with +Y still being the up axis. Rotate objects to align with the canonical axis. 
-        mesh = utils_mesh.shapenet_rotate(mesh_original)
-        verts = np.array(mesh.vertices)
+        #mesh = mesh_original #utils_mesh.shapenet_rotate(mesh_original)
+        #verts = np.array(mesh.vertices)
 
         # Generate random points in the predefined volume that surrounds all the shapes.
         # NOTE: ShapeNet shapes are normalized within [-1, 1]^3

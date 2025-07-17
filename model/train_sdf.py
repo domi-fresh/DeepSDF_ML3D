@@ -26,8 +26,8 @@ class Trainer():
 
     def __call__(self):
         # directories
-        self.timestamp_run = datetime.now().strftime('%d_%m_%H%M%S')   # timestamp to use for logging data
-        self.runs_dir = os.path.dirname(runs.__file__)               # directory fo all runs
+        self.timestamp_run = datetime.now().strftime('%m_%d_%H%M%S')   # timestamp to use for logging data
+        self.runs_dir = os.path.join('results', 'runs_sdf') #os.path.dirname(runs.__file__)               # directory fo all runs
         self.run_dir = os.path.join(self.runs_dir, self.timestamp_run)  # directory for this run
         if not os.path.exists(self.run_dir):
             os.makedirs(self.run_dir)
@@ -170,6 +170,9 @@ class Trainer():
             # batch[0]: [class, x, y, z], shape: (batch_size, 4)
             # batch[1]: [sdf], shape: (batch size)
             iterations += 1.0
+
+            if iterations % 50 == 0:
+                print(f"Iteration: {iterations}; Training batch {i}/{len(train_loader)}")
 
             self.optimizer_model.zero_grad()
             self.optimizer_latent.zero_grad()

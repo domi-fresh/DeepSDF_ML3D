@@ -16,7 +16,13 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def read_params(cfg):
     """Read the settings from the settings.yaml file. These are the settings used during training."""
-    training_settings_path = os.path.join(os.path.dirname(runs_sdf.__file__),  cfg['folder_sdf'], 'settings.yaml') 
+    print(runs_sdf)
+    print(runs_sdf.__file__)  # this will crash if None
+    print("No crash on runs_sdf.__file__")
+    #training_settings_path = os.path.join(os.path.dirname(runs_sdf.__file__),  cfg['folder_sdf'], 'settings.yaml')
+    training_settings_path = os.path.join(
+        'results', 'runs_sdf', cfg['folder_sdf'], 'settings.yaml'
+    )
     with open(training_settings_path, 'rb') as f:
         training_settings = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -37,7 +43,9 @@ def reconstruct_object(cfg, latent_code, obj_idx, model, coords_batches, grad_si
         return
     
     # save mesh as obj
-    mesh_dir = os.path.join(os.path.dirname(runs_sdf.__file__), cfg['folder_sdf'], 'meshes_training')
+    #mesh_dir = os.path.join(os.path.dirname(runs_sdf.__file__), cfg['folder_sdf'], 'meshes_training')
+    mesh_dir = os.path.join('results', 'runs_sdf', cfg['folder_sdf'], 'meshes_training')
+
     if not os.path.exists(mesh_dir):
         os.mkdir(mesh_dir)
     obj_path = os.path.join(mesh_dir, f"mesh_{obj_idx}.obj")
@@ -48,7 +56,8 @@ def main(cfg):
     training_settings = read_params(cfg)
 
     # Load the model
-    weights = os.path.join(os.path.dirname(runs_sdf.__file__), cfg['folder_sdf'], 'weights.pt')
+    #weights = os.path.join(os.path.dirname(runs_sdf.__file__), cfg['folder_sdf'], 'weights.pt')
+    weights = os.path.join('results', 'runs_sdf', cfg['folder_sdf'], 'weights.pt')
 
     model = sdf_model.SDFModel(
         num_layers=training_settings['num_layers'], 
@@ -66,8 +75,9 @@ def main(cfg):
     
     # Load paths
     str2int_path = os.path.join(os.path.dirname(results.__file__), 'idx_str2int_dict.npy')
-    results_dict_path = os.path.join(os.path.dirname(runs_sdf.__file__), cfg['folder_sdf'], 'results.npy')
-    
+    #results_dict_path = os.path.join(os.path.dirname(runs_sdf.__file__), cfg['folder_sdf'], 'results.npy')
+    results_dict_path = os.path.join('results', 'runs_sdf', cfg['folder_sdf'], 'results.npy')
+
     # Load dictionaries
     str2int_dict = np.load(str2int_path, allow_pickle=True).item()
     results_dict = np.load(results_dict_path, allow_pickle=True).item()
