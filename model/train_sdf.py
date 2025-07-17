@@ -1,7 +1,7 @@
 import torch
 import model.model_sdf as sdf_model
 import torch.optim as optim
-import data.dataset_sdf as dataset
+import data.dataset2_sdf as dataset
 from torch.utils.data import random_split
 from torch.utils.data import DataLoader
 import results.runs_sdf as runs
@@ -15,11 +15,18 @@ import results
 from torch.utils.tensorboard import SummaryWriter
 import yaml
 import config_files
-from model import clip
+from pathlib import Path
+
+# ================== MODIFICATION 1 (can be removed) ==================
+from model.clip_model import ClipObjEmbedder
+import clip
+import json
+# =====================================================================
 
 # Select device. The 'mps' device (macOS M1 architecture) is not supported as it cannot currently handle weith normalisation. 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Device: {device}')
+PROJECT_ROOT = str(Path(__file__).parent.parent)
 
 class Trainer():
     def __init__(self, train_cfg):
@@ -28,7 +35,7 @@ class Trainer():
     def __call__(self):
         # directories
         self.timestamp_run = datetime.now().strftime('%d_%m_%H%M%S')   # timestamp to use for logging data
-        self.runs_dir = os.path.dirname(runs.__file__)               # directory fo all runs
+        self.runs_dir = os.path.join(PROJECT_ROOT, "results/runs_sdf/") # directory fo all runs
         self.run_dir = os.path.join(self.runs_dir, self.timestamp_run)  # directory for this run
         if not os.path.exists(self.run_dir):
             os.makedirs(self.run_dir)
@@ -44,7 +51,7 @@ class Trainer():
         samples_dict = np.load(samples_dict_path, allow_pickle=True).item()
 
         # instantiate clip model for class label embeddings
-        self.clip = clip.ClipObjEmbedder
+        self.clip = ClipObjEmbedder().to(device)
         print("Loaded CLIP")
 
         # instantiate model and optimisers
@@ -61,6 +68,24 @@ class Trainer():
         # generate a unique random latent code for each shape
         self.latent_codes = utils_deepsdf.generate_latent_codes(self.train_cfg['latent_size'], samples_dict)
         self.optimizer_latent = optim.Adam([self.latent_codes], lr=self.train_cfg['lr_latent'], weight_decay=0)
+
+        # ================== MODIFICATION 1 (can be removed) ==================
+        categories_dict_path = os.path.join(PROJECT_ROOT, "data/", "shape_info.json")
+        with open(categories_dict_path, "r") as file:
+            categories_dict = json.load(file)
+
+        category_names = list(categories_dict.values())
+        category_ids = list(categories_dict.keys())
+
+        category_label_token = clip.tokenize(category_names).to(device) # (n_categories, 77)
+        with torch.no_grad():
+            category_label_embedding = self.clip(category_label_token) # shape (n_categories, 512)
+
+        self.label_embeddings = {category_id: category_label_embedding[i] for i, category_id in enumerate(category_ids)}
+        print("Computed embedding for every category based on it's label")
+
+        self.idx_int2str_dict = np.load(PROJECT_ROOT, "results/idx_int2str_dict.npy", allow_pickle=True).item()
+        # =====================================================================
         
         # Load pretrained weights and optimisers to continue training
         if self.train_cfg['pretrained']:
@@ -127,8 +152,9 @@ class Trainer():
     def get_loaders(self):
         data = dataset.SDFDataset(self.train_cfg['dataset'])
 
-        if self.train_cfg['clamp']:
-            data.data['sdf'] = torch.clamp(data.data['sdf'], -self.train_cfg['clamp_value'], self.train_cfg['clamp_value'])
+        # moved to forward pass...
+        #if self.train_cfg['clamp']:
+        #    data.data['sdf'] = torch.clamp(data.data['sdf'], -self.train_cfg['clamp_value'], self.train_cfg['clamp_value'])
 
         train_size = int(0.85 * len(data))
         val_size = len(data) - train_size
@@ -150,6 +176,8 @@ class Trainer():
     def generate_xy(self, batch):
         """
         Combine latent code and coordinates.
+        Args:
+            - batch: tuple((batch_size, self.num_samples, 4), (batch_size, num_samples, 1))
         Return:
             - x: class embedding + latent codes + coordinates, torch tensor shape (batch_size, embedding_size + latent_size + 3)
             - y: ground truth sdf, shape (batch_size, 1)
@@ -158,14 +186,22 @@ class Trainer():
             - latent_batch_codes: all latent codes per sample, shape (batch_size, latent_size)
         Return ground truth as y, and the latent codes for this batch.
         """
-        latent_classes_batch = batch[0][:, 0].view(-1, 1).to(torch.long) # shape (batch_size, 1)
-        coords = batch[0][:, 1:] # shape (batch_size, 3)
-        latent_codes_batch = self.latent_codes[latent_classes_batch.view(-1)] # shape (batch_size, 128) # use latent_class 
 
-        label_emb_batch = self.clip(batch[2]) # shape (batch_size, 512)
+        latent_classes_batch = batch[0].view(-1,4)[:,0].to(torch.long) # shape (batch_size*num_samples, 1)
+        coords = batch[0].view(-1,4)[:,1:] # shape (batch_size*num_samples, 1)
+        latent_codes_batch = self.latent_codes[latent_classes_batch.view(-1)] # shape (batch_size*num_samples, latent_size)
 
-        x = torch.hstack((label_emb_batch, latent_codes_batch, coords)) # shape (batch_size, 131 + 512)
-        y = batch[1] # (batch_size, 1)
+        #latent_classes_batch = batch[0][:, 0].view(-1, 1).to(torch.long) # shape (batch_size, 1)
+        #coords = batch[0][:, 1:] # shape (batch_size, 3)
+        #latent_codes_batch = self.latent_codes[latent_classes_batch.view(-1)] # shape (batch_size, 128) # use latent_class 
+
+        # ================== MODIFICATION 1 (can be removed) ==================
+        category_ids = [self.idx_int2str_dict[int(latent_class.item())].split("/")[0] for latent_class in latent_classes_batch] # get categories id e.g. 02876657/<shape id> for entire batch
+        label_emb_batch = torch.stack([self.label_embeddings[category_id] for category_id in category_ids]) # get clip label embedding for category
+        # =====================================================================
+
+        x = torch.hstack((label_emb_batch, latent_codes_batch, coords)).to(device) # shape (batch_size*num_sanples, 131 + 512)
+        y = batch[1].view(-1,1).to(device) # (batch_size*num_samples, 1)
 
         return x, y, latent_classes_batch.view(-1), latent_codes_batch
 
@@ -173,9 +209,10 @@ class Trainer():
         total_loss = 0.0
         iterations = 0.0
         self.model.train()
-        for batch in train_loader:
+        for i, batch in enumerate(train_loader):
             # batch[0]: [class, x, y, z], shape: (batch_size, 4)
             # batch[1]: [sdf], shape: (batch size)
+            # batch[2]: [token], shape (77,)
             iterations += 1.0
 
             self.optimizer_model.zero_grad()
@@ -183,12 +220,17 @@ class Trainer():
 
             x, y, latent_codes_indices_batch, latent_codes_batch = self.generate_xy(batch)
 
+            if self.train_cfg['clamp']:
+                y = torch.clamp(y, -self.train_cfg['clamp_value'], self.train_cfg['clamp_value'])
+
             predictions = self.model(x)  # (batch_size, 1)
             if self.train_cfg['clamp']:
                 predictions = torch.clamp(predictions, -self.train_cfg['clamp_value'], self.train_cfg['clamp_value'])
             
             loss_value, loss_rec, loss_latent = self.train_cfg['loss_multiplier'] * SDFLoss_multishape(y, predictions, x[:, :self.train_cfg['latent_size']], sigma=self.train_cfg['sigma_regulariser'])
-            loss_value.backward()       
+            loss_value.backward()     
+
+            print(f"{i/len(train_loader):.2f}", end="\r")  
 
             self.optimizer_latent.step()
             self.optimizer_model.step()

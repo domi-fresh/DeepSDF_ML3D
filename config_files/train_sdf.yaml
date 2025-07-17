@@ -4,10 +4,10 @@ dataset: 'ShapeNetCore'   # Dataset used
 seed: 42   # Seed for reproducibility
 
 # training
-epochs: 300
+epochs: 1000
 lr_model: 0.00001   # Initial learning rate (model)
 lr_latent: 0.001    # Initial learning rate (latent vector)
-batch_size: 16
+batch_size: 1
 sigma_regulariser: 0.01   # Sigma value as regulariser in the loss function
 loss_multiplier: 1   # Loss multiplier
 clamp: true  # Clip the network prediction
