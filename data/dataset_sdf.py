@@ -21,15 +21,15 @@ class SDFDataset(Dataset):
         for obj_idx in list(samples_dict.keys()):  # samples_dict.keys() for all the objects
             for key in samples_dict[obj_idx].keys():   # keys are ['samples', 'sdf', 'latent_class', 'samples_latent_class']
                 value = torch.from_numpy(samples_dict[obj_idx][key]).float().to(device)
-                if len(value.shape) == 1:    # increase dim if monodimensional, needed to vstack
+                if len(value.shape) == 1:    # increase dim if monodimensional, needed to vstack (add singleton dim)
                     value = value.view(-1, 1)
-                if key not in list(self.data.keys()):
+                if key not in list(self.data.keys()): # add sdf key or samples_latent_class key if first time
                     self.data[key] = value
                 else:
-                    self.data[key] = torch.vstack((self.data[key], value)) # originally every sample is stored as a key value pair --> stack them in a tensor
+                    self.data[key] = torch.vstack((self.data[key], value)) # if key exists stack old values and new values as tensor --> dict{key: tensor}
 
-        self.idx_int2str_dict = np.load(Path(__file__).parent.parent/"results/idx_int2str_dict.npy") # sample_id, class/shape id pair
-        with open("ShapeNetCoreV2/class_label.json") as file: # Label-Class id lookup table TODO: implement for large dataset
+        self.idx_int2str_dict = np.load(Path(__file__).parent.parent/"results/idx_int2str_dict.npy", allow_pickle=True).item() # sample_id, class/shape id pair
+        with open("data/shape_info.json", "r") as file: # Label-Class id lookup table TODO: implement for large dataset
             self.class_label_dict = json.load(file)
 
         return
@@ -38,14 +38,12 @@ class SDFDataset(Dataset):
         return self.data['sdf'].shape[0]
 
     def __getitem__(self, idx):
+        
+
         latent_class = self.data['samples_latent_class'][idx, :] # latent_class is [latent_class(shape) (int), x, y, z]
         sdf = self.data['sdf'][idx]
 
-        class_id = self.idx_int2str_dict[idx].split("/")[0] #get class id for sample at index idx
-        class_label = self.class_label_dict[class_id] # e.g. chair
-        class_label_token = clip.tokenize(class_label) # tokenized(chair) Tensor(77,)
-
-        return latent_class, sdf, class_label_token # --> [latent_shape_class, x, y, z], sdf,
+        return latent_class, sdf # --> [latent_shape_class, x, y, z], sdf
 
 if __name__=='__main__':
     dataset_name = "ShapeNetCore"
