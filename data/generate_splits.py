@@ -24,7 +24,7 @@ def generate_splits(ratios):
         
         with open(f"{dirname}/splits/{name}.txt", "w") as f:
             for filename in files:
-                f.write(filename + '\n')
+                f.writelines(filename)
             
 def generate_splits_uniform(obj_per_cls):
     dirname = os.path.dirname(DATASET.__file__)
@@ -59,7 +59,7 @@ def generate_splits_uniform(obj_per_cls):
             f.write(filename + '\n')
 
 if __name__ == "__main__":
-    generate_splits_uniform([80, 10, 10])
+    generate_splits_uniform([600, 100, 100])
     #generate_splits(
     #    {
     #    "train": 0.8,

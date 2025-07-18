@@ -1,5 +1,6 @@
 import data.ShapeNetCoreV2 as ShapeNetCoreV2
 import os
+import json
 
 DATASET = ShapeNetCoreV2
 
