@@ -8,6 +8,7 @@ import results
 import numpy as np
 import config_files
 import yaml
+
 """Extract mesh from an already optimised latent code and network. 
 Store the mesh in the same folder where the latent code is located."""
 
@@ -66,8 +67,8 @@ def main(cfg):
     coords_batches = torch.split(coords, 100000)
     
     # Load paths
-    str2int_path = os.path.join(os.path.dirname(results.__file__), 'idx_str2int_dict.npy')
-    cls_str2int_path = os.path.join(os.path.dirname(results.__file__), 'cls_str2int_dict.npy')
+    str2int_path = os.path.join(os.path.dirname(runs_sdf.__file__), cfg['folder_sdf'], 'idx_str2int_dict.npy')
+    cls_str2int_path = os.path.join(os.path.dirname(runs_sdf.__file__), cfg['folder_sdf'], 'cls_str2int_dict.npy')
     results_dict_path = os.path.join(os.path.dirname(runs_sdf.__file__), cfg['folder_sdf'], 'results.npy')
     
     # Load dictionaries

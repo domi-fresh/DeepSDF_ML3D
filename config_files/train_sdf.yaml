@@ -4,10 +4,10 @@ dataset: 'ShapeNetCore'   # Dataset used
 seed: 42   # Seed for reproducibility
 
 # training
-epochs: 1500
+epochs: 1000
 lr_model: 0.0005   # Initial learning rate (model)
 lr_latent: 0.001    # Initial learning rate (latent vector)
-batch_size: 4096
+batch_size: 1024
 sigma_regulariser: 0.0001   # Sigma value as regulariser in the loss function
 loss_multiplier: 1   # Loss multiplier
 clamp: true  # Clip the network prediction
@@ -15,12 +15,11 @@ clamp_value: 0.1  # Value for clipping
 
 # architecture
 num_layers: 8   # Num network layers
-inner_dim: 512   # Inner dimensions of the network
-latent_size: 256   # Size of the latent vector
+inner_dim: 256   # Inner dimensions of the network
+latent_size: 128   # Size of the latent vector
 skip_connections: True
 
-class_embed_size : 64   # Size of the class embedding
-num_class: 10           # number of classes in Dataset
+class_embed_size : 32   # Size of the class embedding
 
 # lr_scheduling
 lr_scheduler: True   # Learning rate scheduling
