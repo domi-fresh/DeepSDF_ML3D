@@ -56,6 +56,13 @@ def SDFLoss_triplane_multishape(sdf_gt, prediction, xy_planes, yz_planes, zx_pla
     return loss, l1, reg
 
 
+
+def tv_loss(plane):
+    return torch.mean(torch.abs(plane[:, :, :-1, :] - plane[:, :, 1:, :])) + \
+           torch.mean(torch.abs(plane[:, :, :, :-1] - plane[:, :, :, 1:]))
+
+
+
 def triplane_decorrelation_loss(xy_planes, yz_planes, zx_planes, num_subset_channels=8):
     """
     Compute mean decorrelation loss across all 3 planes for each shape in a batch.

@@ -1,5 +1,5 @@
-import os
 import torch
+import os
 import numpy as np
 import yaml
 import trimesh
@@ -8,150 +8,91 @@ from torch.utils.tensorboard import SummaryWriter
 
 from model.model_triplane import TriPlaneSDFModel
 from utils.utils_deepsdf import get_volume_coords, extract_mesh
-from utils import utils_mesh
-import data.ShapeNetCoreV2 as ShapeNetCoreV2
-import torch.nn.functional as F
+from utils.utils_mesh import _as_mesh, shapenet_rotate
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def read_params(cfg):
-    settings_path = os.path.join("results", "runs_sdf", cfg["folder_sdf"], "settings.yaml")
-    with open(settings_path, "r") as f:
-        return yaml.safe_load(f)
+def load_partial_pointcloud(obj_path, num_points=10000, ratios=(1.0, 1.0, 0.5)):
+    mesh_original = _as_mesh(trimesh.load(obj_path))
+    mesh = shapenet_rotate(mesh_original)
 
-
-def generate_partial_pointcloud(cfg):
-    obj_path = os.path.join('data', 'ShapeNetCoreV2', cfg['obj_ids'], 'models', 'model_normalized.obj')
-    mesh = utils_mesh._as_mesh(trimesh.load(obj_path))
-    mesh = utils_mesh.shapenet_rotate(mesh)
-
-    samples = np.array(trimesh.sample.sample_surface(mesh, 10000)[0])
-    t = [cfg['x_axis_ratio_bbox'], cfg['y_axis_ratio_bbox'], cfg['z_axis_ratio_bbox']]
+    samples = np.array(trimesh.sample.sample_surface(mesh, num_points)[0])
     v_min, v_max = mesh.bounds
+
     for i in range(3):
-        t_max = v_min[i] + t[i] * (v_max[i] - v_min[i])
+        t_max = v_min[i] + ratios[i] * (v_max[i] - v_min[i])
         samples = samples[samples[:, i] < t_max]
+
     return samples
 
 
-def infer_latent_code(model, pointcloud, sdf_gt, cfg, writer):
-    latent = torch.zeros(3 * model.plane_feat_dim, device=device, requires_grad=True)
-    optimizer = torch.optim.Adam([latent], lr=cfg['lr'])
+def optimize_triplanes(model, partial_pc, cfg):
+    B = partial_pc.shape[0]
+    pc_tensor = torch.tensor(partial_pc, dtype=torch.float32).to(device)
+    sdf_gt = torch.zeros((B, 1), dtype=torch.float32).to(device)
 
-    if cfg.get('lr_scheduler', False):
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=cfg['lr_multiplier'],
-            patience=cfg['patience'], threshold=0.0001, threshold_mode='rel'
-        )
+    xy = torch.randn(1, cfg['plane_feat_dim'], cfg['plane_res'], cfg['plane_res'], device=device, requires_grad=True)
+    yz = torch.randn_like(xy)
+    zx = torch.randn_like(xy)
 
-    for step in range(cfg['epochs']):
+    optimizer = torch.optim.Adam([xy, yz, zx], lr=cfg['lr'])
+    loss_fn = torch.nn.MSELoss()
+
+    for step in range(cfg['opt_steps']):
         optimizer.zero_grad()
-
-        B = pointcloud.shape[0]
-        shape_ids = torch.zeros(B, dtype=torch.long, device=device)
-
-        # Fake tri-planes from latent
-        latent_planes = latent.view(3, model.plane_feat_dim, 1, 1)
-        xy, yz, zx = latent_planes[0].expand(1, -1, model.plane_res, model.plane_res), \
-                     latent_planes[1].expand(1, -1, model.plane_res, model.plane_res), \
-                     latent_planes[2].expand(1, -1, model.plane_res, model.plane_res)
-
-
-        #feats = model.sample_triplane_features(pointcloud, xy, yz, zx)
-        #sdf_pred = model.decoder(feats)
-
-        #loss = torch.nn.functional.mse_loss(sdf_pred, sdf_gt)
-
-        batch_size = 1024  # or lower, depending on memory
-        loss_total = 0.0
-
-        for i in range(0, pointcloud.shape[0], batch_size):
-            coords_batch = pointcloud[i:i + batch_size]
-            sdf_batch = sdf_gt[i:i + batch_size]
-
-            feats = model.sample_triplane_features(coords_batch, xy, yz, zx)
-            sdf_pred = model.decoder(feats)
-            loss = F.mse_loss(sdf_pred, sdf_batch)
-
-            loss_total += loss
-
-        loss = loss_total / (pointcloud.shape[0] // batch_size)
-
+        sdf_pred, _ = model(coords=pc_tensor, xy_plane=xy, yz_plane=yz, zx_plane=zx)
+        loss = loss_fn(sdf_pred, sdf_gt)
         loss.backward()
         optimizer.step()
-        if cfg.get('lr_scheduler', False):
-            scheduler.step(loss)
 
-        if step % 10 == 0:
-            writer.add_scalar("LatentOpt/Loss", loss.item(), step)
+        if step % 50 == 0:
+            print(f"Step {step:04d} | Loss: {loss.item():.6f}")
 
-    return latent.detach()
-
-
-def reconstruct_from_latent(model, latent, resolution, save_path):
-    coords, grid_shape = get_volume_coords(resolution)
-    coords = coords.to(device)
-    sdf_batches = []
-
-    latent_planes = latent.view(3, model.plane_feat_dim, 1, 1)
-    xy = latent_planes[0].expand(1, -1, model.plane_res, model.plane_res)
-    yz = latent_planes[1].expand(1, -1, model.plane_res, model.plane_res)
-    zx = latent_planes[2].expand(1, -1, model.plane_res, model.plane_res)
-
-    with torch.no_grad():
-        for coords_batch in torch.split(coords, 25000):
-            B = coords_batch.size(0)
-            #shape_ids = torch.zeros(B, dtype=torch.long, device=device)
-            feats = model.sample_triplane_features(coords_batch, xy, yz, zx)
-            sdf_batch = model.decoder(feats)
-            sdf_batches.append(sdf_batch)
-
-    sdf = torch.cat(sdf_batches, dim=0)
-    verts, faces = extract_mesh(grid_shape, sdf)
-    mesh = trimesh.Trimesh(verts, faces)
-    mesh.export(save_path)
-    print(f"[✓] Mesh saved to: {save_path}")
+    return xy, yz, zx
 
 
 def main(cfg):
-    train_cfg = read_params(cfg)
-    run_dir = os.path.join("results", "runs_sdf", cfg["folder_sdf"])
-    out_dir = os.path.join(run_dir, f"infer_triplane_{datetime.now().strftime('%m_%d_%H%M%S')}")
-    os.makedirs(out_dir, exist_ok=True)
+    output_dir = os.path.join('results', 'runs_triplane', 'infer_latent_' + datetime.now().strftime('%m_%d_%H%M'))
+    os.makedirs(output_dir, exist_ok=True)
 
-    writer = SummaryWriter(log_dir=out_dir)
+    writer = SummaryWriter(log_dir=output_dir)
 
-    # Load model
-    num_shapes = len(np.load(os.path.join("results", f"samples_dict_{train_cfg['dataset']}.npy"), allow_pickle=True).item())
     model = TriPlaneSDFModel(
-        num_shapes=num_shapes,
-        plane_feat_dim=train_cfg["plane_feat_dim"],
-        plane_res=train_cfg["plane_res"],
-        decoder_hidden_dim=train_cfg["decoder_hidden_dim"]
+        num_shapes=1,
+        plane_feat_dim=cfg['plane_feat_dim'],
+        plane_res=cfg['plane_res'],
+        num_layers=cfg['num_layers'],
+        skip_connections=True,
+        inner_dim=cfg['inner_dim'],
+        output_dim=1
     ).to(device)
 
-    weights_path = os.path.join(run_dir, "weights.pt")
-    model.load_state_dict(torch.load(weights_path, map_location=device))
     model.eval()
 
-    # Generate partial point cloud
-    pointcloud_np = generate_partial_pointcloud(cfg)
-    np.save(os.path.join(out_dir, 'partial_pointcloud.npy'), pointcloud_np)
+    coords, grad_size_axis = get_volume_coords(cfg['resolution'])
+    coords_batches = torch.split(coords.to(device), 100000)
 
-    pointcloud = torch.tensor(pointcloud_np, dtype=torch.float32, device=device)
-    sdf_gt = torch.zeros_like(pointcloud[:, 0]).view(-1, 1).to(device)
+    obj_path = os.path.join('data', 'ShapeNetCoreV2', cfg['obj_id'], 'models', 'model_normalized.obj')
+    partial_pc = load_partial_pointcloud(obj_path, ratios=(cfg['x_ratio'], cfg['y_ratio'], cfg['z_ratio']))
+    np.save(os.path.join(output_dir, 'partial_pointcloud.npy'), partial_pc)
 
-    # Infer best latent code
-    latent = infer_latent_code(model, pointcloud, sdf_gt, cfg, writer)
+    xy, yz, zx = optimize_triplanes(model, partial_pc, cfg)
 
-    # Reconstruct full mesh
-    out_path = os.path.join(out_dir, "output_mesh.obj")
-    reconstruct_from_latent(model, latent, cfg["resolution"], out_path)
+    sdf = []
+    with torch.no_grad():
+        for batch in coords_batches:
+            sdf_batch, _ = model(batch, xy_plane=xy, yz_plane=yz, zx_plane=zx)
+            sdf.append(sdf_batch.squeeze(-1).cpu().numpy())
+
+    sdf = np.concatenate(sdf, axis=0)
+    verts, faces = extract_mesh(grad_size_axis, sdf)
+    mesh = trimesh.Trimesh(verts, faces)
+    mesh.export(os.path.join(output_dir, 'output_mesh.obj'))
 
 
-if __name__ == "__main__":
-    cfg_path = os.path.join("config_files", "shape_completion.yaml")
-    with open(cfg_path, "r") as f:
+if __name__ == '__main__':
+    with open(os.path.join('config_files', 'shape_completion_triplane.yaml'), 'r') as f:
         cfg = yaml.safe_load(f)
     main(cfg)

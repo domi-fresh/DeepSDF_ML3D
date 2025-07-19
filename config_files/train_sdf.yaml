@@ -5,11 +5,11 @@ seed: 42   # Seed for reproducibility
 
 # training
 #epochs: 300
-epochs: 10
+epochs: 150
 lr_model: 0.00001   # Initial learning rate (model)
 lr_latent: 0.001    # Initial learning rate (latent vector)
-batch_size: 256
-sigma_regulariser: 0.01   # Sigma value as regulariser in the loss function
+batch_size: 1 #024
+sigma_regulariser: 0.001   # Sigma value as regulariser in the loss function
 loss_multiplier: 1   # Loss multiplier
 clamp: true  # Clip the network prediction
 clamp_value: 0.1  # Value for clipping
@@ -34,4 +34,13 @@ pretrain_optim_latent: ''   # Path to pretrain weights (latent codes)
 
 ##### Parameters for triplane:
 plane_feat_dim: 16
-plane_res: 32
+plane_res: 64
+lr_triplane: 0.001
+log_interval: 500
+lambda_tv: 0.01
+regularize_tv_interval: 3
+lambda_decorr: 0.01
+regularize_decorr_interval: 3
+regularize_until_epoch: 50
+samples_per_shape: 4096 # 8192 #16384
+model_mode: 0

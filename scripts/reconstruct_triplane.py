@@ -75,6 +75,7 @@ def reconstruct_shape(shape_id, model, resolution, save_path):
             feats = model.sample_triplane_features(coords_batch, xy_plane, yz_plane, zx_plane)
 
             # Forward through full model (including skip logic and final layer)
+            #sdf_batch, _ = model.forward(coords_batch, xy_plane=xy_plane, yz_plane=yz_plane, zx_plane=zx_plane)
             sdf_batch = model.forward(coords_batch, xy_plane=xy_plane, yz_plane=yz_plane, zx_plane=zx_plane)
             sdf_preds.append(sdf_batch)
 
@@ -106,7 +107,8 @@ def main(cfg):
         plane_res=train_cfg['plane_res'],
         num_layers=train_cfg['num_layers'],
         skip_connections=train_cfg['skip_connections'],
-        inner_dim=train_cfg['inner_dim']
+        inner_dim=train_cfg['inner_dim'], 
+        mode=train_cfg['model_mode']
     ).float().to(device)
 
     weights_path = os.path.join("results", "runs_sdf", cfg["folder_sdf"], "weights.pt")
@@ -119,10 +121,12 @@ def main(cfg):
     for obj_id in cfg["obj_ids"]:
         shape_idx = str2int_dict[obj_id]
         save_path = os.path.join("results", "runs_sdf", cfg["folder_sdf"], "meshes_training", f"mesh_{shape_idx}.obj")
-        reconstruct_shape(shape_idx, model, cfg["resolution"], save_path)
-
         vis_path = os.path.join("results", "runs_sdf", cfg["folder_sdf"], "meshes_training", f"mesh_{shape_idx}_vis_triplanes")
         visualize_and_save_triplane_features(model=model, shape_idx=shape_idx, out_dir= vis_path, max_channels=64)
+        
+        reconstruct_shape(shape_idx, model, cfg["resolution"], save_path)
+
+        
 
 if __name__ == "__main__":
     cfg_path = os.path.join('config_files', 'reconstruct_triplane.yaml')

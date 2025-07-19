@@ -1,11 +1,13 @@
 # Config file for reconstructing objects from latent code
 
-folder_sdf: '07_17_1254_triplane'   # Path containing training results, stored in results/runs_sdf, example: '14_05_2023'
-obj_ids: ['02942699/5d42d432ec71bfa1d5004b533b242ce6']   # List of object IDs to reconstruct from ShapeNetCore as category/instance, example: ['02942699/6d036fd1c70e5a5849493d905c02fa86'].
-#obj_ids: ['03001627_subset_600/1ab4c6ef68073113cf004563556ddb36']
-resolution: 128
+folder_sdf: '07_19_2217_triplane'   # Path containing training results, stored in results/runs_sdf, example: '14_05_2023'
+#obj_ids: ['02942699/5d42d432ec71bfa1d5004b533b242ce6']   # List of object IDs to reconstruct from ShapeNetCore as category/instance, example: ['02942699/6d036fd1c70e5a5849493d905c02fa86'].
+#obj_ids: ['03001627_subset_6/1aa07508b731af79814e2be0234da26c']
+obj_ids: ['02942699/5d42d432ec71bfa1d5004b533b242ce6', '02691156_subset_64/1a6ad7a24bb89733f412783097373bdc', '03001627_subset_64/1aa07508b731af79814e2be0234da26c']
+
+resolution: 256
 
 
-# jet: 02691156_subset_6/1a6ad7a24bb89733f412783097373bdc
+# jet: 02691156_subset_66/1a6ad7a24bb89733f412783097373bdc
 # camera: 02942699/5d42d432ec71bfa1d5004b533b242ce6
-# chair: 03001627_subset_600/1ab4c6ef68073113cf004563556ddb36
+# chair: 03001627_subset_64/1ab4c6ef68073113cf004563556ddb36
