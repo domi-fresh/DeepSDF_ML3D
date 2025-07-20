@@ -76,7 +76,7 @@ class SDFModel(torch.nn.Module):
         return sdf
 
 
-    def infer_latent_code(self, cfg, pointcloud, sdf_gt, writer, latent_code_initial, class_emb:torch.Tensor):
+    def infer_latent_code(self, cfg, pointcloud, sdf_gt, writer, latent_code_initial, class_emb):
         """Infer latent code from coordinates, their sdf, and a trained model.
         
         Args:
@@ -101,7 +101,7 @@ class SDFModel(torch.nn.Module):
             
             n_pts = pointcloud.shape[0]
             latent_code_tile = torch.tile(latent_code, (n_pts, 1)) # (128,) --> (n_pts, 128) (tile automatically unsqueezes)
-            x = torch.hstack((latent_code_tile, pointcloud, class_emb.tile(n_pts, 1))) # column-wise stacking (n_pts, 128 + 3 + 512)
+            x = torch.hstack((class_emb.tile(n_pts, 1), latent_code_tile, pointcloud)) # column-wise stacking (n_pts, 512 + 128 + 3)
 
             optim.zero_grad()
 
@@ -110,7 +110,7 @@ class SDFModel(torch.nn.Module):
             if cfg['clamp']:
                 predictions = torch.clamp(predictions, -cfg['clamp_value'], cfg['clamp_value'])
 
-            loss_value, l1, l2 = utils_deepsdf.SDFLoss_multishape(sdf_gt, predictions, x[:, :self.latent_size], sigma=cfg['sigma_regulariser'])
+            loss_value, l1, l2 = utils_deepsdf.SDFLoss_multishape(sdf_gt, predictions, x[:, self.dim_embedding:(self.dim_embedding+self.latent_size)], sigma=cfg['sigma_regulariser'])
             loss_value.backward()
 
             if writer is not None:

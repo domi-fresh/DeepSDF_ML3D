@@ -16,6 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 import yaml
 import config_files
 from pathlib import Path
+import time
 
 # ================== MODIFICATION 1 (can be removed) ==================
 from model.clip_model import ClipObjEmbedder
@@ -81,10 +82,19 @@ class Trainer():
         with torch.no_grad():
             category_label_embedding = self.clip(category_label_token) # shape (n_categories, 512)
 
-        self.label_embeddings = {category_id: category_label_embedding[i] for i, category_id in enumerate(category_ids)}
+        label_embeddings = {category_id: category_label_embedding[i] for i, category_id in enumerate(category_ids)}
         print("Computed embedding for every category based on it's label")
+        idx_int2str_dict_path = os.path.join(PROJECT_ROOT, "results/idx_int2str_dict.npy")
+        idx_int2str_dict = np.load(idx_int2str_dict_path, allow_pickle=True).item()
 
-        self.idx_int2str_dict = np.load(PROJECT_ROOT, "results/idx_int2str_dict.npy", allow_pickle=True).item()
+        self.idx_int2_labelemb = torch.empty(len(idx_int2str_dict.keys()), 512)
+
+        for key in idx_int2str_dict.keys():
+            category_id = idx_int2str_dict[key].split("/")[0]
+            category_label_emb = label_embeddings[category_id] # label emb as tensor            
+            self.idx_int2_labelemb[key,:] = category_label_emb # fill in lookup tensor
+
+        self.idx_int2_labelemb = self.idx_int2_labelemb.to(device)
         # =====================================================================
         
         # Load pretrained weights and optimisers to continue training
@@ -126,8 +136,8 @@ class Trainer():
             with torch.no_grad():
                 avg_val_loss = self.validate(val_loader)
 
-                if avg_val_loss < best_loss:
-                    best_loss = np.copy(avg_val_loss)
+                if avg_train_loss < best_loss:
+                    best_loss = np.copy(avg_train_loss)
                     best_weights = self.model.state_dict()
                     best_latent_codes = self.latent_codes.detach().cpu().numpy()
                     optimizer_model_state = self.optimizer_model.state_dict()
@@ -140,14 +150,27 @@ class Trainer():
                     self.results['best_latent_codes'] = best_latent_codes
 
                 if self.train_cfg['lr_scheduler']:
-                    self.scheduler_model.step(avg_val_loss)
-                    self.scheduler_latent.step(avg_val_loss)
+                    self.scheduler_model.step(avg_train_loss)
+                    self.scheduler_latent.step(avg_train_loss)
 
                     self.writer.add_scalar('Learning rate (model)', self.scheduler_model._last_lr[0], epoch)
                     self.writer.add_scalar('Learning rate (latent)', self.scheduler_latent._last_lr[0], epoch)            
             
         end = time.time()
         print(f'Time elapsed: {end - start} s')
+
+        # Save final model
+        best_weights = self.model.state_dict()
+        best_latent_codes = self.latent_codes.detach().cpu().numpy()
+        optimizer_model_state = self.optimizer_model.state_dict()
+        optimizer_latent_state = self.optimizer_latent.state_dict()
+
+        np.save(os.path.join(self.run_dir, 'results.npy'), self.results)
+        torch.save(best_weights, os.path.join(self.run_dir, 'weights.pt'))
+        torch.save(optimizer_model_state, os.path.join(self.run_dir, 'optimizer_model_state.pt'))
+        torch.save(optimizer_latent_state, os.path.join(self.run_dir, 'optimizer_latent_state.pt'))
+        self.results['best_latent_codes'] = best_latent_codes
+
 
     def get_loaders(self):
         data = dataset.SDFDataset(self.train_cfg['dataset'])
@@ -196,11 +219,10 @@ class Trainer():
         #latent_codes_batch = self.latent_codes[latent_classes_batch.view(-1)] # shape (batch_size, 128) # use latent_class 
 
         # ================== MODIFICATION 1 (can be removed) ==================
-        category_ids = [self.idx_int2str_dict[int(latent_class.item())].split("/")[0] for latent_class in latent_classes_batch] # get categories id e.g. 02876657/<shape id> for entire batch
-        label_emb_batch = torch.stack([self.label_embeddings[category_id] for category_id in category_ids]) # get clip label embedding for category
+        label_emb_batch = self.idx_int2_labelemb[latent_classes_batch.view(-1)] # shape (batch_size*num_samples, 512)
         # =====================================================================
 
-        x = torch.hstack((label_emb_batch, latent_codes_batch, coords)).to(device) # shape (batch_size*num_sanples, 131 + 512)
+        x = torch.hstack((label_emb_batch, latent_codes_batch, coords)).to(device) # shape (batch_size*num_sanples, 512 + 128 + 3)
         y = batch[1].view(-1,1).to(device) # (batch_size*num_samples, 1)
 
         return x, y, latent_classes_batch.view(-1), latent_codes_batch
@@ -226,15 +248,16 @@ class Trainer():
             predictions = self.model(x)  # (batch_size, 1)
             if self.train_cfg['clamp']:
                 predictions = torch.clamp(predictions, -self.train_cfg['clamp_value'], self.train_cfg['clamp_value'])
-            
-            loss_value, loss_rec, loss_latent = self.train_cfg['loss_multiplier'] * SDFLoss_multishape(y, predictions, x[:, :self.train_cfg['latent_size']], sigma=self.train_cfg['sigma_regulariser'])
+           
+            loss_value, loss_rec, loss_latent = self.train_cfg['loss_multiplier'] * SDFLoss_multishape(y, predictions, x[:, 512:(512 + self.train_cfg['latent_size'])], sigma=self.train_cfg['sigma_regulariser'])
             loss_value.backward()     
 
-            print(f"{i/len(train_loader):.2f}", end="\r")  
+            if (i+1) % 500 == 0:
+                print(f"{i+1}/{len(train_loader)}")  
 
             self.optimizer_latent.step()
             self.optimizer_model.step()
-            total_loss += loss_value.data.cpu().numpy()  
+            total_loss += loss_value.item()
 
         avg_train_loss = total_loss/iterations
         print(f'Training: loss {avg_train_loss}')

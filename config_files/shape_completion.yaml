@@ -1,13 +1,14 @@
 # Config file for reconstructing objects from latent code
 
-folder_sdf: '17_07_172540'   # Path containing training results, stored in results/runs_sdf, example: '14_05_2023'
-obj_ids: '02942699/5d42d432ec71bfa1d5004b533b242ce6'   # Object ID to reconstruct from ShapeNetCore as category/instance, example: ['02942699/6d036fd1c70e5a5849493d905c02fa86'].
+folder_sdf: '18_07_150021'   # Path containing training results, stored in results/runs_sdf, example: '14_05_2023'
+obj_ids: '03001627/1aa07508b731af79814e2be0234da26c'   # Object ID to reconstruct from ShapeNetCore as category/instance, example: ['02942699/6d036fd1c70e5a5849493d905c02fa86'].
 resolution: 256
+category_ids: '03001627' # can be different than in obj_ids
 
 # Visible bounding box for shape completion
 x_axis_ratio_bbox: 1   # e.g. x_axis_ratio_bbox: 0.5, visible poincloud in half the object bounding box along the x-axis
-y_axis_ratio_bbox: 0.5
-z_axis_ratio_bbox: 1
+y_axis_ratio_bbox: 1
+z_axis_ratio_bbox: 0.5
 
 # Inference parameters
 epochs: 10000   # Number of epochs for latent code inference"
