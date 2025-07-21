@@ -1,10 +1,10 @@
 # Config file for training SIREN model
 
-dataset: 'ShapeNetCore'   # Dataset used
+dataset: 'classic'   # Dataset used
 seed: 42   # Seed for reproducibility
 
 # training
-epochs: 150
+epochs: 1000
 lr_model: 0.00001   # Initial learning rate (model)
 lr_latent: 0.001    # Initial learning rate (latent vector)
 batch_size: 1
