@@ -46,7 +46,17 @@ def process_single_mesh(args):
         return None
 
 def main(cfg):
-    obj_paths = glob(os.path.join(os.path.dirname(ShapeNetCoreV2.__file__), '*', '*', 'models', '*.obj'))
+    base_dir = os.path.dirname(ShapeNetCoreV2.__file__)
+    class_dirs = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
+
+    obj_paths = []
+    for class_id in class_dirs:
+        class_dir = os.path.join(base_dir, class_id)
+        obj_dirs = sorted(glob(os.path.join(class_dir, '*')))[:600]  # First 600 objects in this class
+        for obj_dir in obj_dirs:
+            obj_path = os.path.join(obj_dir, 'models', 'model_normalized.obj')
+            if os.path.exists(obj_path):
+                obj_paths.append(obj_path)
     args_list = [(idx, path, cfg) for idx, path in enumerate(obj_paths)]
 
     samples_dict = {}
