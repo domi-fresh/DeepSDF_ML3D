@@ -135,12 +135,19 @@ class Trainer():
         data = dataset.SDFDataset(self.train_cfg['dataset'])
         print("Checking latent class values in dataset:")
         for k, v in data.data.items():
-            latent_classes = v['class_labels'] if 'class_labels' in v else None
-            if latent_classes is not None:
-             print(f"Shape {k} latent classes min: {latent_classes.min()}, max: {latent_classes.max()}")
+            latent_classes = None
+        # Try different possible keys that might contain latent class labels
+            if 'class_labels' in v:
+                latent_classes = v['class_labels']
+            elif 'samples_latent_class' in v:
+                latent_classes = v['samples_latent_class'][:, 0]  # if first col is latent class index
             else:
-        # Otherwise print sample values from data:
-                print(f"Shape {k} sample latent class values (first 10):")
+                latent_classes = None
+
+            if latent_classes is not None and len(latent_classes) > 0:
+                print(f"Shape {k} latent classes min: {latent_classes.min()}, max: {latent_classes.max()}")
+            else:
+                print(f"Shape {k} has no latent class info")
 
 
         if self.train_cfg['clamp']:
