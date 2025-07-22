@@ -79,6 +79,9 @@ class SDFShapeBatchDatasetBalanced(torch.utils.data.Dataset):
         obj_data = self.samples_dict[shape_id]
 
         coords = obj_data['samples_latent_class'][:, -3:]  # (N, 3)
+        # Squeeze only if coords has an unnecessary last dimension
+        if coords.ndim == 3 and coords.shape[-1] == 1:
+            coords = coords.squeeze(-1)
         sdfs = obj_data['sdf']  # (N,)
 
         if self.balance_sdf:
