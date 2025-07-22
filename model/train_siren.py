@@ -133,6 +133,14 @@ class Trainer():
 
     def get_loaders(self):
         data = dataset.SDFDataset(self.train_cfg['dataset'])
+        print("Checking latent class values in dataset:")
+        for k, v in data.data.items():
+            latent_classes = v['class_labels'] if 'class_labels' in v else None
+            if latent_classes is not None:
+             print(f"Shape {k} latent classes min: {latent_classes.min()}, max: {latent_classes.max()}")
+            else:
+        # Otherwise print sample values from data:
+                print(f"Shape {k} sample latent class values (first 10):")
 
 
         if self.train_cfg['clamp']:
