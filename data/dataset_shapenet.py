@@ -98,8 +98,6 @@ class ShapeNetSDFDataset(Dataset):
         batch['points_val'] = batch['points_val'].to(device)
         batch['sdf_val'] = batch['sdf_val'].to(device)
         
-
-    
 if __name__ == "__main__":
     dataset = ShapeNetSDFDataset(split="train", num_sample_points=1024)
     dataset[0]

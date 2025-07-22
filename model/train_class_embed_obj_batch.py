@@ -44,7 +44,7 @@ class Trainer():
                 latent_size=self.train_cfg['latent_size'] + self.train_cfg['class_embed_size']
             ).float().to(device)
 
-        train_dataset = dataset.ShapeNetSDFDataset("train", 1024)
+        train_dataset = dataset.ShapeNetSDFDataset("train", self.train_cfg["batch_size"])
         train_dataloader = torch.utils.data.DataLoader(
             train_dataset,   
             batch_size=1,   

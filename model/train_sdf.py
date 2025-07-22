@@ -129,11 +129,11 @@ class Trainer():
         val_size = len(data) - train_size
         train_data, val_data = random_split(data, [train_size, val_size])
         train_loader = DataLoader(
-                train_data,
-                batch_size=self.train_cfg['batch_size'],
-                shuffle=True,
-                drop_last=False
-            )
+            train_data,
+            batch_size=self.train_cfg['batch_size'],
+            shuffle=True,
+            drop_last=False       
+        )
         val_loader = DataLoader(
             val_data,
             batch_size=self.train_cfg['batch_size'],
