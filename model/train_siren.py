@@ -173,14 +173,23 @@ class Trainer():
             - latent_batch_codes: all latent codes per sample, shape (batch_size, latent_size)
         Return ground truth as y, and the latent codes for this batch.
         """
-        latent_classes_batch = batch[0][:, 0].view(-1, 1).to(torch.long)               # shape (batch_size, 1)
-        coords = batch[0][:, 1:]                                  # shape (batch_size, 3)
-        latent_codes_batch = self.latent_codes[latent_classes_batch.view(-1)]    # shape (batch_size, 128)
+        batch_latent_coords = batch[0]
+        batch_sdf = batch[1]
+
+        B, N, _ = batch_latent_coords.shape
+        flattened = batch_latent_coords.reshape(B*N, 4)
+        latent_classes_batch = flattened[:, 0].view(-1, 1).to(torch.long)
+        coords = flattened[:, 1:]
+        latent_codes_batch = self.latent_codes[latent_classes_batch.view(-1)]           # shape (batch_size, 1)
+        x = torch.hstack((latent_codes_batch, coords))                               # shape (batch_size, 3)
+        y = batch_sdf.reshape(B*N, 1)   # shape (batch_size, 128)
 
         x = torch.hstack((latent_codes_batch, coords))                  # shape (batch_size, 131)
         y = batch[1]     # (batch_size, 1)
 
         return x, y, latent_classes_batch.view(-1), latent_codes_batch
+    
+        
 
     def train(self, train_loader):
         total_loss = 0.0

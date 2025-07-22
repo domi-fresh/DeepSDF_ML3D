@@ -62,6 +62,60 @@ class SDFDataset(Dataset): #benjamin
 
 
 
+class SDFShapeBatchDatasetBalanced(torch.utils.data.Dataset):
+    def __init__(self, dataset_name, samples_per_shape=4096, balance_sdf=True):
+        samples_dict_path = os.path.join(os.path.dirname(results.__file__), f'samples_dict_{dataset_name}.npy')
+        self.samples_dict = np.load(samples_dict_path, allow_pickle=True).item()
+        self.samples_per_shape = samples_per_shape
+        self.balance_sdf = balance_sdf
+
+        self.shape_ids = list(self.samples_dict.keys())
+
+    def __len__(self):
+        return len(self.shape_ids)
+
+    def __getitem__(self, idx):
+        shape_id = self.shape_ids[idx]
+        obj_data = self.samples_dict[shape_id]
+
+        coords = obj_data['samples_latent_class'][:, -3:]  # (N, 3)
+        sdfs = obj_data['sdf']  # (N,)
+
+        if self.balance_sdf:
+            # Split indices
+            inside = np.where(sdfs < 0)[0]
+            outside = np.where(sdfs >= 0)[0]
+
+            
+            if len(inside) == 0:
+                print(f"[Warning] Shape {idx} has empty inside samples")
+                indices = np.random.choice(len(sdfs), size=self.samples_per_shape, replace=False)
+                
+            elif len(outside) == 0:
+                print(f"[Warning] Shape {idx} has empty outside samples")
+                indices = np.random.choice(len(sdfs), size=self.samples_per_shape, replace=False)
+            else:
+                half = self.samples_per_shape // 2
+                if len(inside) < half:
+                    inside_idxs = np.random.choice(len(inside), size=half, replace=True)
+                else:
+                    inside_idxs = np.random.choice(len(inside), size=half, replace=False)
+
+                if len(outside) < half:
+                    outside_idxs = np.random.choice(len(outside), size=half, replace=True)
+                else:
+                    outside_idxs = np.random.choice(len(outside), size=half, replace=False)
+                
+
+                indices = np.concatenate([inside_idxs, outside_idxs])
+        else:
+            indices = np.random.choice(len(sdfs), size=self.samples_per_shape, replace=False)
+
+        coords_sampled = torch.from_numpy(coords[indices]).float()
+        sdfs_sampled = torch.from_numpy(sdfs[indices]).float()
+
+        return coords_sampled, sdfs_sampled, shape_id
+
 if __name__=='__main__':
     dataset_name = "classic"
     dataset = SDFDataset(dataset_name)
