@@ -81,6 +81,7 @@ class Trainer():
             self.scheduler_latent =  torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer_latent, mode='min', factor=self.train_cfg['lr_multiplier'], patience=self.train_cfg['patience'], threshold=0.0001, threshold_mode='rel')
             
         # get data
+       # train_loader, val_loader = self.get_loaders()
         train_loader, val_loader = self.get_loaders()
         self.results = {
             'best_latent_codes' : []
@@ -119,11 +120,20 @@ class Trainer():
             
         end = time.time()
         print(f'Time elapsed: {end - start} s')
+        best_weights = self.model.state_dict()
+        best_latent_codes = self.latent_codes.detach().cpu().numpy()
+        optimizer_model_state = self.optimizer_model.state_dict()
+        optimizer_latent_state = self.optimizer_latent.state_dict()
+
+        np.save(os.path.join(self.run_dir, 'results.npy'), self.results)
+        torch.save(best_weights, os.path.join(self.run_dir, 'weights.pt'))
+        torch.save(optimizer_model_state, os.path.join(self.run_dir, 'optimizer_model_state.pt'))
+        torch.save(optimizer_latent_state, os.path.join(self.run_dir, 'optimizer_latent_state.pt'))
+        self.results['best_latent_codes'] = best_latent_codes
 
     def get_loaders(self):
         data = dataset.SDFDataset(self.train_cfg['dataset'])
 
-        print(data.data.keys())
 
         if self.train_cfg['clamp']:
             data.data['sdf'] = torch.clamp(data.data['sdf'], -self.train_cfg['clamp_value'], self.train_cfg['clamp_value'])
@@ -144,6 +154,8 @@ class Trainer():
             drop_last=True
             )
         return train_loader, val_loader
+    
+    
 
     def generate_xy(self, batch):
         """
@@ -169,7 +181,7 @@ class Trainer():
         total_loss = 0.0
         iterations = 0.0
         self.model.train()
-        for batch in train_loader:
+        for i, batch in train_loader:
             # batch[0]: [class, x, y, z], shape: (batch_size, 4)
             # batch[1]: [sdf], shape: (batch size)
             iterations += 1.0
@@ -184,11 +196,12 @@ class Trainer():
                 predictions = torch.clamp(predictions, -self.train_cfg['clamp_value'], self.train_cfg['clamp_value'])
             
             loss_value, loss_rec, loss_latent = self.train_cfg['loss_multiplier'] * SDFLoss_multishape(y, predictions, x[:, :self.train_cfg['latent_size']], sigma=self.train_cfg['sigma_regulariser'])
-            loss_value.backward()       
+            loss_value.backward()  
+    
 
             self.optimizer_latent.step()
             self.optimizer_model.step()
-            total_loss += loss_value.data.cpu().numpy()  
+            total_loss += loss_value.data.cpu().numpy()
 
         avg_train_loss = total_loss/iterations
         print(f'Training: loss {avg_train_loss}')
