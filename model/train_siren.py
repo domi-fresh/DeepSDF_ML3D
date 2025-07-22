@@ -187,6 +187,9 @@ class Trainer():
         B, N, _ = batch_latent_coords.shape
         flattened = batch_latent_coords.reshape(B*N, 4)
         latent_classes_batch = flattened[:, 0].view(-1, 1).to(torch.long)
+        print("latent_classes_batch min:", latent_classes_batch.min().item())
+        print("latent_classes_batch max:", latent_classes_batch.max().item())
+        print("latent_codes shape:", self.latent_codes.shape)
         coords = flattened[:, 1:]
         latent_codes_batch = self.latent_codes[latent_classes_batch.view(-1)]           # shape (batch_size, 1)
         x = torch.hstack((latent_codes_batch, coords))                               # shape (batch_size, 3)
