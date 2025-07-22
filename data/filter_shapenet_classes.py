@@ -7,10 +7,6 @@ os.makedirs(results_dir, exist_ok=True)
 
 target_classes = {
     "chair": "03001627",
-    "plane": "02691156",
-    "sofa": "04256520",
-    "lamp": "03636649",
-    "table": "04379243"
 }
 max_per_class = 600  # amount per class
 
@@ -47,7 +43,7 @@ for class_name, class_id in target_classes.items():
         new_index += 1
 
     
-np.save(os.path.join(results_dir, "samples_dict_classic.npy"), filtered_samples_dict)
+np.save(os.path.join(results_dir, "samples_dict_chair.npy"), filtered_samples_dict)
 np.save(os.path.join(results_dir, "idx_int2str_dict.npy"), filtered_idx2str)
 np.save(os.path.join(results_dir, "idx_str2int_dict.npy"), filtered_str2idx)
 
