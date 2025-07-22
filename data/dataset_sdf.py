@@ -64,6 +64,7 @@ class SDFDataset(Dataset): #benjamin
 
 
 
+
 if __name__=='__main__':
     dataset_name = "classic"
     dataset = SDFDataset(dataset_name)
