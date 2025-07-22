@@ -55,7 +55,7 @@ class Trainer():
         self.optimizer_model = optim.Adam(self.model.parameters(), lr=self.train_cfg['lr_model'], weight_decay=0)
         
         # generate a unique random latent code for each shape
-        self.latent_codes = utils_deepsdf.generate_latent_codes(self.train_cfg['latent_size'], samples_dict)
+        self.latent_codes = utils_deepsdf.generate_latent_codes(self.train_cfg['latent_size'], samples_dict, num_latent_classes=dataset.num_latent_classes)
         self.optimizer_latent = optim.Adam([self.latent_codes], lr=self.train_cfg['lr_latent'], weight_decay=0)
         
         # Load pretrained weights and optimisers to continue training

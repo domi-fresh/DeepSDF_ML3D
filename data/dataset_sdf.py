@@ -21,6 +21,16 @@ class SDFDataset(Dataset): #benjamin
         self.num_samples = 4096 # num of samples to randomply sample from each object per forward pass
         assert self.num_samples <= 4096, "Num samples to high! Only for < 4096 it can be guaranteed to sample 50/50 pos/neg SDF"
 
+        all_latent_classes = set()
+        for obj in self.data.values():
+            latent_ids = obj['samples_latent_class'][:, 0]
+            all_latent_classes.update(latent_ids.tolist())
+        
+        unique_classes = sorted(list(all_latent_classes))
+        self.latent_class_id_to_idx = {cls_id: idx for idx, cls_id in enumerate(unique_classes)}
+        self.num_latent_classes = len(unique_classes)
+        print(f'Number of unique latent classes: {self.num_latent_classes}')
+
     def __len__(self):
         return len(self.data.keys())
 
@@ -28,7 +38,11 @@ class SDFDataset(Dataset): #benjamin
         
         obj = self.data[idx]  #{sdf: 0, samples_latent_class: [latent_class, x, y, z]}
         sdf = obj["sdf"] # shape (23000,1)
-        latent_class = obj['samples_latent_class'] # shape (23000,4)
+        latent_class = obj['samples_latent_class'].copy() # shape (23000,4)
+
+        # Map raw latent class IDs to zero-based indices for the first column
+        latent_ids_raw = latent_class[:, 0].astype(int)
+        latent_class[:, 0] = np.array([self.latent_class_id_to_idx[i] for i in latent_ids_raw])
 
         # get points with positive and negative sdf
         latent_class_pos = torch.from_numpy(latent_class[np.where(sdf >= 0)[0]]).float()
@@ -57,7 +71,9 @@ class SDFDataset(Dataset): #benjamin
 
         samples_latent_class = torch.cat((latent_class_pos[indices_pos], latent_class_neg[indices_neg]), dim=0).to(device) 
         samples_sdf = torch.cat((sdf_pos[indices_pos], sdf_neg[indices_neg]), dim=0).to(device)
-        print(f'latent_class unique values: {torch.unique(torch.from_numpy(latent_class[:,0]))}')
+        # Debug print: unique latent class indices (zero-based)
+        print(f'latent_class unique mapped indices: {torch.unique(samples_latent_class[:,0])}')
+        
 
 
         return samples_latent_class, samples_sdf # [latent_shape_class, x, y, z], sdf shape (self.num_samples, 4), (self.num_samples,1)
