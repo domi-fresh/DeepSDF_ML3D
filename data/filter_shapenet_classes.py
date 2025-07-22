@@ -16,8 +16,10 @@ max_per_class = 600  # amount per class
 
 samples_path = os.path.join(results_dir, "samples_dict_ShapeNetCore.npy")
 np.load(samples_path, allow_pickle=True).item()
-idx2str = np.load(results_dir,"idx_int2str_dict.npy", allow_pickle=True).item()
-str2idx = np.load(results_dir,"idx_str2int_dict.npy", allow_pickle=True).item()
+idx2str_path = os.path.join(results_dir, "idx_int2str_dict.npy")
+idx2str = np.load(idx2str_path, allow_pickle=True).item()
+str2idx_path = os.path.join(results_dir, "idx_str2int_dict.npy")
+str2idx = np.load(str2idx_path, allow_pickle=True).item()
 
 #new filter dictionaries
 filtered_samples_dict = {}
