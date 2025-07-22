@@ -186,7 +186,7 @@ class Trainer():
         total_loss = 0.0
         iterations = 0.0
         self.model.train()
-        for i, batch in train_loader:
+        for batch in train_loader:
             # batch[0]: [class, x, y, z], shape: (batch_size, 4)
             # batch[1]: [sdf], shape: (batch size)
             iterations += 1.0
