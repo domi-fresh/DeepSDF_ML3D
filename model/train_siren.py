@@ -136,7 +136,12 @@ class Trainer():
 
 
         if self.train_cfg['clamp']:
-            data.data['sdf'] = torch.clamp(data.data['sdf'], -self.train_cfg['clamp_value'], self.train_cfg['clamp_value'])
+            for k in data.data:
+                data.data[k]['sdf'] = torch.clamp(
+                    torch.from_numpy(data.data[k]['sdf']),
+                    -self.train_cfg['clamp_value'],
+                    self.train_cfg['clamp_value']
+                 ).numpy()
 
         train_size = int(0.85 * len(data))
         val_size = len(data) - train_size
