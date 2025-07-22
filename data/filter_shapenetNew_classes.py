@@ -12,7 +12,8 @@ target_classes = {
 max_per_class = 600  # amount per class
 
 
-samples_dict = np.load(results_dir, "samples_dict_ShapeNetCore.npy", allow_pickle=True).item()
+samples_path = os.path.join(results_dir, "samples_dict_ShapeNetCore.npy")
+np.load(samples_path, allow_pickle=True).item()
 idx2str = np.load(results_dir, "idx_int2str_dict.npy", allow_pickle=True).item()
 str2idx = np.load(results_dir, "idx_str2int_dict.npy", allow_pickle=True).item()
 
