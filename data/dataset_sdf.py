@@ -17,6 +17,7 @@ class SDFDataset(Dataset): #benjamin
         
         # data dict with structure {sample_1: {sdf: 0, samples_latent_class: [latent_class, x, y, z]}, sample_2: ...}
         self.data = np.load(os.path.join(os.path.dirname(results.__file__), f'samples_dict_{dataset_name}.npy'), allow_pickle=True).item()
+        
         self.num_samples = 4096 # num of samples to randomply sample from each object per forward pass
         assert self.num_samples <= 4096, "Num samples to high! Only for < 4096 it can be guaranteed to sample 50/50 pos/neg SDF"
 
@@ -116,7 +117,7 @@ class SDFShapeBatchDatasetBalanced(torch.utils.data.Dataset):
         return coords_sampled, sdfs_sampled, shape_id
 
 if __name__=='__main__':
-    dataset_name = "ShapeNetCore"
+    dataset_name = "classic"
     dataset = SDFDataset(dataset_name)
 
 

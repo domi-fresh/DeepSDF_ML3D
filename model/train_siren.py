@@ -123,6 +123,8 @@ class Trainer():
     def get_loaders(self):
         data = dataset.SDFDataset(self.train_cfg['dataset'])
 
+        print(data.data.keys())
+
         if self.train_cfg['clamp']:
             data.data['sdf'] = torch.clamp(data.data['sdf'], -self.train_cfg['clamp_value'], self.train_cfg['clamp_value'])
 
