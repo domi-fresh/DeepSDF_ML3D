@@ -9,9 +9,9 @@ target_classes = {
 max_per_class = 600  # amount per class
 
 
-samples_dict = np.load("../results/samples_dict_ShapeNetCore.npy", allow_pickle=True).item()
-idx2str = np.load("../results/idx_int2str_dict.npy", allow_pickle=True).item()
-str2idx = np.load("../results/idx_str2int_dict.npy", allow_pickle=True).item()
+samples_dict = np.load("samples_dict_ShapeNetCore.npy", allow_pickle=True).item()
+idx2str = np.load("idx_int2str_dict.npy", allow_pickle=True).item()
+str2idx = np.load("idx_str2int_dict.npy", allow_pickle=True).item()
 
 #new filter dictionaries
 filtered_samples_dict = {}
@@ -39,6 +39,6 @@ for class_name, class_id in target_classes.items():
         new_index += 1
 
     
-np.save("../results/samples_dict_new.npy", filtered_samples_dict)
-np.save("../results/idx_int2str_dict_new.npy", filtered_idx2str)
-np.save("../results/idx_str2int_dict_new.npy", filtered_str2idx)
+np.save("samples_dict_new.npy", filtered_samples_dict)
+np.save("idx_int2str_dict_new.npy", filtered_idx2str)
+np.save("idx_str2int_dict_new.npy", filtered_str2idx)
