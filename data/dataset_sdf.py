@@ -29,7 +29,7 @@ class SDFDataset(Dataset): #benjamin
         unique_classes = sorted(list(all_latent_classes))
         self.latent_class_id_to_idx = {cls_id: idx for idx, cls_id in enumerate(unique_classes)}
         self.num_latent_classes = len(unique_classes)
-        print(f'Number of unique latent classes: {self.num_latent_classes}')
+        
 
     def __len__(self):
         return len(self.data.keys())
@@ -72,7 +72,7 @@ class SDFDataset(Dataset): #benjamin
         samples_latent_class = torch.cat((latent_class_pos[indices_pos], latent_class_neg[indices_neg]), dim=0).to(device) 
         samples_sdf = torch.cat((sdf_pos[indices_pos], sdf_neg[indices_neg]), dim=0).to(device)
         # Debug print: unique latent class indices (zero-based)
-        print(f'latent_class unique mapped indices: {torch.unique(samples_latent_class[:,0])}')
+        
         
 
 
