@@ -47,7 +47,7 @@ for class_name, class_id in target_classes.items():
         new_index += 1
 
     
-np.save(results_dir,"samples_dict_classic.npy", filtered_samples_dict)
-np.save(results_dir,"dx_int2str_dict_classic.npy", filtered_idx2str)
-np.save(results_dir,"idx_str2int_dict_classic.npy", filtered_str2idx)
+np.save(os.path.join(results_dir, "samples_dict_classic.npy"), filtered_samples_dict)
+np.save(os.path.join(results_dir, "idx_int2str_dict_classic.npy"), filtered_idx2str)
+np.save(os.path.join(results_dir, "idx_str2int_dict_classic.npy"), filtered_str2idx)
 
