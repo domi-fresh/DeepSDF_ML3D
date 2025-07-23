@@ -82,7 +82,7 @@ def predict_sdf(latent, coords_batches, model):
 def extract_mesh(grad_size_axis, sdf):
     # Extract zero-level set with marching cubes
     grid_sdf = sdf.view(grad_size_axis, grad_size_axis, grad_size_axis).detach().cpu().numpy()
-    vertices, faces, normals, _ = skimage.measure.marching_cubes(grid_sdf, level=0.55)
+    vertices, faces, normals, _ = skimage.measure.marching_cubes(grid_sdf, level=0.45)
 
     print(f"SDF grid min value: {np.min(grid_sdf)}")
     print(f"SDF grid max value: {np.max(grid_sdf)}")
