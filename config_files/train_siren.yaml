@@ -4,7 +4,7 @@ dataset: 'chair'   # Dataset used
 seed: 42   # Seed for reproducibility
 
 # training
-epochs: 150
+epochs: 500
 lr_model: 0.00001   # Initial learning rate (model)
 lr_latent: 0.001    # Initial learning rate (latent vector)
 batch_size: 1
