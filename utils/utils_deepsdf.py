@@ -84,6 +84,11 @@ def extract_mesh(grad_size_axis, sdf):
     grid_sdf = sdf.view(grad_size_axis, grad_size_axis, grad_size_axis).detach().cpu().numpy()
     vertices, faces, normals, _ = skimage.measure.marching_cubes(grid_sdf, level=0.00)
 
+    print(f"SDF grid min value: {np.min(grid_sdf)}")
+    print(f"SDF grid max value: {np.max(grid_sdf)}")
+    print(f"SDF grid mean value: {np.mean(grid_sdf)}")
+    print(f"SDF grid median value: {np.median(grid_sdf)}")
+
     # Rescale vertices extracted with marching cubes (https://stackoverflow.com/questions/70834443/converting-indices-in-marching-cubes-to-original-x-y-z-space-visualizing-isosu)
     x_max = np.array([1, 1, 1])
     x_min = np.array([-1, -1, -1])
