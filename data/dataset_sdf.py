@@ -82,7 +82,7 @@ class SDFDataset(Dataset): #benjamin
 
 
 if __name__=='__main__':
-    dataset_name = "bench"
+    dataset_name = "sofa"
     dataset = SDFDataset(dataset_name)
 
 
