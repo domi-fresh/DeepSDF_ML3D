@@ -6,7 +6,7 @@ os.makedirs(results_dir, exist_ok=True)
 
 
 target_classes = {
-    "bench": "02828884"
+    "guitar": "03467517"
 ,
 }
 max_per_class = 600  # amount per class
