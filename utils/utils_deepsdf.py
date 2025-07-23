@@ -7,7 +7,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # mp.offline()
 
-def clamp(x, delta=torch.tensor(0.1).to(device)):
+def clamp(x, delta=torch.tensor(0.5).to(device)):
     """Clamp function introduced in the paper DeepSDF.
     This returns a value in range [-delta, delta]. If x is within this range, it returns x, else one of the extremes.
 
@@ -82,7 +82,7 @@ def predict_sdf(latent, coords_batches, model):
 def extract_mesh(grad_size_axis, sdf):
     # Extract zero-level set with marching cubes
     grid_sdf = sdf.view(grad_size_axis, grad_size_axis, grad_size_axis).detach().cpu().numpy()
-    vertices, faces, normals, _ = skimage.measure.marching_cubes(grid_sdf, level=0.31)
+    vertices, faces, normals, _ = skimage.measure.marching_cubes(grid_sdf, level=0.00)
 
     print(f"SDF grid min value: {np.min(grid_sdf)}")
     print(f"SDF grid max value: {np.max(grid_sdf)}")
