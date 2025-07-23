@@ -80,7 +80,7 @@ class SDFModel(torch.nn.Module):
         Returns:
             sdf: output tensor of shape (batch_size, 1)
         """      
-        input_data = x.clone().detach()
+        input_data = x.clone()
 
         # Forward pass
         if self.skip_connections and self.num_layers >= 5:
