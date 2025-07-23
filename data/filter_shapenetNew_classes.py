@@ -45,6 +45,6 @@ for class_name, class_id in target_classes.items():
         new_index += 1
 
     
-np.save(os.path.join(results_dir, "samples_dict_guitar.npy"), filtered_samples_dict)
-#np.save(os.path.join(results_dir, "idx_int2str_dict_new.npy"), filtered_idx2str)
-#np.save(os.path.join(results_dir, "idx_str2int_dict_new.npy"), filtered_str2idx)
+# np.save(os.path.join(results_dir, "samples_dict_guitar.npy"), filtered_samples_dict)
+np.save(os.path.join(results_dir, "idx_int2str_dict.npy"), filtered_idx2str)
+np.save(os.path.join(results_dir, "idx_str2int_dict.npy"), filtered_str2idx)
