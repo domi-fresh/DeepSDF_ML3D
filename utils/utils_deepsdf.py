@@ -7,7 +7,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # mp.offline()
 
-def clamp(x, delta=torch.tensor(0.5).to(device)):
+def clamp(x, delta=torch.tensor(0.1).to(device)):
     """Clamp function introduced in the paper DeepSDF.
     This returns a value in range [-delta, delta]. If x is within this range, it returns x, else one of the extremes.
 
