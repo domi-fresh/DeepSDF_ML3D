@@ -4,7 +4,7 @@ dataset: 'ShapeNetCore'   # Dataset used
 seed: 42   # Seed for reproducibility
 
 # training
-epochs: 1000
+epochs: 500
 lr_model: 0.0005   # Initial learning rate (model)
 lr_latent: 0.001    # Initial learning rate (latent vector)
 batch_size: 1024
@@ -19,7 +19,7 @@ inner_dim: 256   # Inner dimensions of the network
 latent_size: 128   # Size of the latent vector
 skip_connections: True
 
-class_embed_size : 32   # Size of the class embedding
+class_embed_size : 16   # Size of the class embedding
 
 # lr_scheduling
 lr_scheduler: True   # Learning rate scheduling

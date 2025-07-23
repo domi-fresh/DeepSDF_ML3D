@@ -128,3 +128,61 @@ class SDFModel(torch.nn.Module):
                 writer.add_scalar('Inference loss', loss_value.detach().cpu().item(), epoch)
 
         return best_latent_code
+
+    def infer_latent_code_with_cls_embed(self, cfg, pointcloud, sdf_gt, writer, latent_code_initial, class_embed):
+        """Infer latent code from coordinates, their sdf, and a trained model."""
+
+        latent_code = latent_code_initial.clone().detach().requires_grad_(True)
+        class_embed = torch.tensor(class_embed, dtype=torch.float32).to(device).requires_grad_(False)
+        
+        optim = torch.optim.Adam([latent_code], lr=cfg['lr'])
+
+        if cfg['lr_scheduler']:
+            scheduler_latent = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, mode='min', 
+                                                    factor=cfg['lr_multiplier'], 
+                                                    patience=cfg['patience'], 
+                                                    threshold=0.001, threshold_mode='rel')
+
+        best_loss = 1000000
+
+        for epoch in tqdm(range(0, cfg['epochs'])):
+
+            latent_code_tile = torch.tile(latent_code, (pointcloud.shape[0], 1))
+            class_embed_tile = torch.tile(class_embed, (pointcloud.shape[0], 1))
+            x = torch.hstack((class_embed_tile, latent_code_tile, pointcloud))
+
+            optim.zero_grad()
+
+            predictions = self(x)
+
+            if cfg['clamp']:
+                predictions = torch.clamp(predictions, -cfg['clamp_value'], cfg['clamp_value'])
+
+            loss_value, l1, l2 = utils_deepsdf.SDFLoss_multishape(sdf_gt, predictions, x[:, :self.latent_size], sigma=cfg['sigma_regulariser'])
+            loss_value.backward()
+
+            if writer is not None:
+                writer.add_scalar('Reconstruction loss', l1.data.cpu().numpy(), epoch)
+                writer.add_scalar('Latent code loss', l2.data.cpu().numpy(), epoch)
+
+            optim.step()
+
+            if l1.detach().cpu().item() < best_loss:
+                best_loss = l1.detach().cpu().item()
+                best_latent_code = latent_code.clone()
+
+            # step scheduler and store on tensorboard (optional)
+            if cfg['lr_scheduler']:
+                scheduler_latent.step(loss_value.item())
+                if writer is not None:
+                    writer.add_scalar('Learning rate', scheduler_latent._last_lr[0], epoch)
+
+                if scheduler_latent._last_lr[0] < 1e-6:
+                    print('Learning rate too small, stopping training')
+                    break
+
+            # logging
+            if writer is not None:
+                writer.add_scalar('Inference loss', loss_value.detach().cpu().item(), epoch)
+
+        return best_latent_code

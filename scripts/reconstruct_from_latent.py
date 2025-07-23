@@ -52,7 +52,7 @@ def main(cfg):
 
     model = sdf_model.SDFModel(
         num_layers=training_settings['num_layers'], 
-        skip_connections=training_settings['latent_size'], 
+        skip_connections=training_settings['skip_connections'], 
         latent_size=training_settings['latent_size'], 
         inner_dim=training_settings['inner_dim']).to(device)
     model.load_state_dict(torch.load(weights, map_location=device))
