@@ -86,8 +86,7 @@ class Trainer():
        # train_loader, val_loader = self.get_loaders()
         train_loader, val_loader = self.get_loaders()
         self.results = {
-            'best_latent_codes' : [],
-            "trained_object_ids": self.trained_object_ids
+            'best_latent_codes' : []
         }
 
         best_loss = 10000000000
@@ -136,7 +135,6 @@ class Trainer():
 
     def get_loaders(self):
         data = dataset.SDFDataset(self.train_cfg['dataset'])
-        self.trained_object_ids = list(data.data.keys())
         
         train_size = int(0.85 * len(data))
         val_size = len(data) - train_size
