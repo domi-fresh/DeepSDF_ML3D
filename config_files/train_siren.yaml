@@ -1,6 +1,6 @@
 # Config file for training SIREN model
 
-dataset: 'plane'   # Dataset used
+dataset: 'sofa'   # Dataset used
 seed: 42   # Seed for reproducibility
 
 # training
