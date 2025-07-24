@@ -1,8 +1,8 @@
 # Config file for benchmarking
 
-folder_sdf: '20_07_140651' # Path containing training results i.e. model weights; stored in results/runs_sdf, example: '14_05_2023'
+folder_sdf: '24_07_112141' # Path containing training results i.e. model weights; stored in results/runs_sdf, example: '14_05_2023'
 resolution: 128
-category_ids: ['02691156','03001627','03636649','04256520','04379243'] # categories of shapes to be used in benchmark
+category_ids: ['03001627'] # categories of shapes to be used in benchmark
 benchmark_samples: 5 # number of shapes per category to be used for benchmark
 save_output_meshes: True # If output meshes of benchmark should be saved
 save_every: 1 # Indicate after how many samples the results should be saved to file
