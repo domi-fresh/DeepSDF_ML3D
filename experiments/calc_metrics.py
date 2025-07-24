@@ -10,7 +10,6 @@ import yaml
 from utils import utils_mesh
 from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
-import clip
 import json
 from pathlib import Path
 from glob import glob
