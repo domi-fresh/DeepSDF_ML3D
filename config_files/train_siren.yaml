@@ -15,7 +15,7 @@ clamp_value: 0.5  # Value for clipping
 
 # architecture
 num_layers: 8   # Num network layers
-inner_dim: 512   # Inner dimensions of the network
+inner_dim: 256   # Inner dimensions of the network
 latent_size: 64   # Size of the latent vector
 skip_connections: True
 
