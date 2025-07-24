@@ -5,7 +5,7 @@ seed: 42   # Seed for reproducibility
 
 # training
 epochs: 150
-lr_model: 0.00001   # Initial learning rate (model)
+lr_model: 0.0001   # Initial learning rate (model)
 lr_latent: 0.001    # Initial learning rate (latent vector)
 batch_size: 1
 sigma_regulariser: 0.001   # Sigma value as regulariser in the loss function
@@ -15,7 +15,7 @@ clamp_value: 0.5  # Value for clipping
 
 # architecture
 num_layers: 8   # Num network layers
-inner_dim: 256   # Inner dimensions of the network
+inner_dim: 512   # Inner dimensions of the network
 latent_size: 64   # Size of the latent vector
 skip_connections: True
 
