@@ -38,7 +38,7 @@ def get_test_split(cfg):
 
 def read_params(cfg):
     """Read the settings from the settings.yaml file. These are the settings used during training."""
-    training_settings_path = os.path.join(PROJECT_ROOT, "results/runs_sdf",  cfg['folder_sdf'], 'settings.yaml') 
+    training_settings_path = os.path.join(PROJECT_ROOT, "results",  cfg['folder_sdf'], 'settings.yaml') 
     with open(training_settings_path, 'rb') as f:
         training_settings = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -77,7 +77,7 @@ def main(cfg):
     model_settings = read_params(cfg)
 
     # Set directory and paths
-    model_dir = os.path.join(PROJECT_ROOT, "results/runs_sdf", cfg['folder_sdf'])
+    model_dir = os.path.join(PROJECT_ROOT, "results", cfg['folder_sdf'])
 
     # Directory to save reconstructed objects to
     inference_dir = os.path.join(PROJECT_ROOT, "experiments/" f"benchmark_{datetime.now().strftime('%d_%m_%H%M%S')}")
