@@ -10,6 +10,8 @@ import yaml
 from utils import utils_mesh
 from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
+# from model.clip_model import ClipObjEmbedder
+# import clip
 import json
 from pathlib import Path
 from glob import glob
@@ -95,6 +97,11 @@ def main(cfg):
         inner_dim=model_settings['inner_dim']).to(device)
     model.load_state_dict(torch.load(weights, map_location=device))
 
+    # =============================== MOD 1 ===============================
+    #with open(os.path.join(PROJECT_ROOT, "data/shape_info.json"), "r") as file:
+    #    category_id2label_dict = json.load(file)
+   # clipmodel = ClipObjEmbedder().to(device)
+    # ======================================================================
 
     # Path and json to save results to
     results_dict_path = os.path.join(PROJECT_ROOT, f"experiments/results_{datetime.now().strftime('%d_%m_%H%M%S')}.json")
@@ -142,12 +149,17 @@ def main(cfg):
         latent_code = torch.mean(torch.tensor(latent_code, dtype=torch.float32), dim=0).to(device)
         latent_code.requires_grad = True
     
+        # =============================== MOD 1 ===============================
+       # with torch.no_grad():
+           # category_label = category_id2label_dict[obj_category_id]
+           # category_embedding = clipmodel(clip.tokenize(category_label).to(device))
+        # ======================================================================
 
         # Infer latent code
-        best_latent_code = model.infer_latent_code(cfg, pointcloud, sdf_gt, writer, latent_code, category_embedding)
+        best_latent_code = model.infer_latent_code(cfg, pointcloud, sdf_gt, writer, latent_code) # category_embedding entfernt
 
         # Extract mesh obtained with the latent code optimised at inference
-        sdf = utils_deepsdf.predict_sdf(category_embedding, best_latent_code, coords_batches, model)
+        sdf = utils_deepsdf.predict_sdf(best_latent_code, coords_batches, model) # category_embedding entfernt
         
         try:
             vertices, faces = utils_deepsdf.extract_mesh(grad_size_axis, sdf)
@@ -179,6 +191,67 @@ def main(cfg):
             print("test")
             with open(results_dict_path, "w") as file:
                 json.dump(results_dict, file, indent=4)
+
+
+   # =============================== HIER FINALE SPEICHERUNG HINZUFÜGEN (bereits besprochen) ===============================
+    print("\nBenchmarking abgeschlossen. Speichere finale Ergebnisse...")
+    with open(results_dict_path, "w") as file:
+        json.dump(results_dict, file, indent=4)
+    print(f"Alle Ergebnisse in {results_dict_path} gespeichert.")
+    # ==================================================================================================
+
+    # =============================== NEUER BLOCK: Metriken auf der Konsole ausgeben ===============================
+    print("\n============================== Zusammengefasste Metriken ==============================")
+    for category_id, metrics in results_dict.items():
+        print(f"--- Metriken für Kategorie: {category_id} ---")
+        
+        processed_samples = metrics["processed_samples"]
+        if processed_samples == 0:
+            print("  Keine Samples für diese Kategorie verarbeitet.")
+            continue
+        print(f"  Verarbeitete Samples: {processed_samples}")
+
+        # Chamfer Distance (CD)
+        chamfer_values = metrics["chamfer"]
+        if len(chamfer_values) > 0:
+            # Überprüfen, ob Chamfer-Werte Tupel [mean_part, median_part] sind
+            if isinstance(chamfer_values[0], (list, tuple)) and len(chamfer_values[0]) == 2:
+                cd_mean_per_sample = np.array([val[0] for val in chamfer_values]) # Extrahiere den Mean-Teil
+                cd_median_per_sample = np.array([val[1] for val in chamfer_values]) # Extrahiere den Median-Teil
+                
+                cd_mean_total = np.mean(cd_mean_per_sample)
+                cd_median_total = np.mean(cd_median_per_sample) # Mittelwert der Mediane
+                print(f"  CD mean (Sum of Means): {cd_mean_total:.6f}")
+                print(f"  CD med. (Mean of Medians): {cd_median_total:.6f}")
+            else: # Einfache Zahlenliste
+                cd_mean_total = np.mean(chamfer_values)
+                cd_median_total = np.median(chamfer_values)
+                print(f"  CD mean: {cd_mean_total:.6f}")
+                print(f"  CD med.: {cd_median_total:.6f}")
+        else:
+            print("  CD: Keine Daten verfügbar.")
+
+
+        # Earth Mover's Distance (EMD)
+        emd_values = metrics["emd"]
+        if len(emd_values) > 0:
+            emd_mean = np.mean(emd_values)
+            print(f"  EMD mean: {emd_mean:.6f}")
+        else:
+            print("  EMD: Keine Daten verfügbar.")
+
+        # Mesh Accuracy (Mesh Acc.)
+        mesh_acc_values = metrics["mesh_acc"]
+        if len(mesh_acc_values) > 0:
+            mesh_acc_mean = np.mean(mesh_acc_values)
+            print(f"  Mesh Acc. mean: {mesh_acc_mean:.6f}")
+        else:
+            print("  Mesh Acc.: Keine Daten verfügbar.")
+        
+        print("-" * 40 + "\n")
+    print("================================================================================")
+    # ==============================================================================================
+
 
 
 if __name__ == '__main__':
