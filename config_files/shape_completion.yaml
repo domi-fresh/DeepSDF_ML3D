@@ -1,7 +1,7 @@
 # Config file for reconstructing objects from latent code
 
 folder_sdf: '24_07_024533'   # Path containing training results, stored in results/runs_sdf, example: '14_05_2023'
-obj_ids: '03001627/1013f70851210a618f2e765c4a8ed3d' # , '02942699/5d42d432ec71bfa1d5004b533b242ce6', '03797390/ea127b5b9ba0696967699ff4ba91a25']   # List of object IDs to reconstruct from ShapeNetCore as category/instance, example: ['02942699/6d036fd1c70e5a5849493d905c02fa86']   # Object ID to reconstruct from ShapeNetCore as category/instance, example: ['02942699/6d036fd1c70e5a5849493d905c02fa86'].
+obj_ids: '03001627/103a0a413d4c3353a723872ad91e4ed1' # , '02942699/5d42d432ec71bfa1d5004b533b242ce6', '03797390/ea127b5b9ba0696967699ff4ba91a25']   # List of object IDs to reconstruct from ShapeNetCore as category/instance, example: ['02942699/6d036fd1c70e5a5849493d905c02fa86']   # Object ID to reconstruct from ShapeNetCore as category/instance, example: ['02942699/6d036fd1c70e5a5849493d905c02fa86'].
 resolution: 256
 
 # Visible bounding box for shape completion
