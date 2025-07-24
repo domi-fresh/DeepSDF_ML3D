@@ -10,7 +10,6 @@ import yaml
 from utils import utils_mesh
 from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
-from model.clip_model import ClipObjEmbedder
 import clip
 import json
 from pathlib import Path
@@ -97,11 +96,6 @@ def main(cfg):
         inner_dim=model_settings['inner_dim']).to(device)
     model.load_state_dict(torch.load(weights, map_location=device))
 
-    # =============================== MOD 1 ===============================
-    with open(os.path.join(PROJECT_ROOT, "data/shape_info.json"), "r") as file:
-        category_id2label_dict = json.load(file)
-    clipmodel = ClipObjEmbedder().to(device)
-    # ======================================================================
 
     # Path and json to save results to
     results_dict_path = os.path.join(PROJECT_ROOT, f"experiments/results_{datetime.now().strftime('%d_%m_%H%M%S')}.json")
@@ -149,11 +143,6 @@ def main(cfg):
         latent_code = torch.mean(torch.tensor(latent_code, dtype=torch.float32), dim=0).to(device)
         latent_code.requires_grad = True
     
-        # =============================== MOD 1 ===============================
-        with torch.no_grad():
-            category_label = category_id2label_dict[obj_category_id]
-            category_embedding = clipmodel(clip.tokenize(category_label).to(device))
-        # ======================================================================
 
         # Infer latent code
         best_latent_code = model.infer_latent_code(cfg, pointcloud, sdf_gt, writer, latent_code, category_embedding)
