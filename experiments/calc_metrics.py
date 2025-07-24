@@ -24,7 +24,7 @@ PROJECT_ROOT = str(Path(__file__).parent.parent)
 def get_test_split(cfg):
     """Get paths to all objects used for benchmarking"""
 
-    shapenetcore_path = "/Users/benjaminkasper/Documents/Uni/RCI/Module/ml3dgeo/ShapeNetCore"
+    shapenetcore_path = "/cluster/51/jgabe/DeepSDF_ML3D/data/ShapeNetCoreV2"
     obj_paths = []
     allowed_categories = cfg['category_ids']  # specific categories
 
