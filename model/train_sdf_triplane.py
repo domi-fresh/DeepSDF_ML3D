@@ -6,7 +6,7 @@ from data.dataset_sdf import SDFShapeBatchDatasetBalanced
 from torch.utils.data import random_split
 from torch.utils.data import DataLoader
 import results.runs_sdf as runs
-from utils.utils_deepsdf import SDFLoss_multishape, SDFLoss_triplane_multishape, triplane_decorrelation_loss, tv_loss
+from utils.utils_deepsdf import SDFLoss_multishape, SDFLoss_triplane_multishape, triplane_decorrelation_loss, tv_loss, generate_triplane_codes
 import os
 from datetime import datetime
 import numpy as np
@@ -65,25 +65,33 @@ class Trainer():
             num_layers=train_cfg['num_layers'],
             skip_connections=self.train_cfg['skip_connections'],
             inner_dim=self.train_cfg['inner_dim'],
-            mode=train_cfg['model_mode']
+            mode=train_cfg['model_mode'],
+            device=device
         ).float().to(device)
 
-        triplane_params = [
-            self.model.xy_planes,
-            self.model.yz_planes,
-            self.model.zx_planes
-        ]
+        #triplane_params = [
+        #    self.model.xy_planes,
+        #    self.model.yz_planes,
+        #    self.model.zx_planes
+        #]
+        
         mlp_params = [p for n, p in self.model.named_parameters()
                       if not n.startswith(("xy_planes", "yz_planes", "zx_planes"))]
 
         #########################################################
 
-        # define optimisers
-        #self.optimizer_model = optim.Adam(self.model.parameters(), lr=self.train_cfg['lr_model'], weight_decay=0)
+        self.triplane_codes = generate_triplane_codes(
+            plane_feat_dim=self.train_cfg['plane_feat_dim'],
+            plane_res=self.train_cfg['plane_res'],
+            samples_dict=samples_dict
+        )
 
         # Two optimizers
         self.optimizer_mlp = optim.Adam(mlp_params, lr=self.train_cfg['lr_model'], weight_decay=1e-5)
-        self.optimizer_triplane = optim.Adam(triplane_params, lr=self.train_cfg['lr_triplane'])
+        self.optimizer_triplane = optim.Adam([  self.triplane_codes['xy'],
+                                                self.triplane_codes['yz'],
+                                                self.triplane_codes['zx']
+                                                ], lr=self.train_cfg['lr_triplane'])
 
         self.regularize_decorr_interval = train_cfg['regularize_decorr_interval']
         self.lambda_decorr = train_cfg['lambda_decorr']
@@ -136,8 +144,10 @@ class Trainer():
         
         #self.results = {'best_latent_codes' : []}
         self.results = {
-            'best_triplanes' : []
+            'best_triplane_codes': {
+            }
         }
+        np.save(os.path.join(self.run_dir, 'results.npy'), self.results)
 
         best_loss = 10000000000
         start = time.time()
@@ -148,22 +158,28 @@ class Trainer():
             avg_train_loss = self.train(train_loader)
 
             with torch.no_grad():
-                avg_val_loss = self.validate(val_loader)
+                #avg_val_loss = self.validate(val_loader)
 
                 if avg_train_loss < best_loss: #avg_val_loss < best_loss:
-                    best_loss = np.copy(avg_val_loss)
+                    best_loss = np.copy(avg_train_loss) #(avg_val_loss)
                     best_weights = self.model.state_dict()
-                    #best_latent_codes = self.latent_codes.detach().cpu().numpy()
+                    best_triplane_codes = {
+                        'xy': self.triplane_codes['xy'].detach().cpu().numpy(),
+                        'yz': self.triplane_codes['yz'].detach().cpu().numpy(),
+                        'zx': self.triplane_codes['zx'].detach().cpu().numpy()
+                    }
                     #optimizer_model_state = self.optimizer_model.state_dict()
                     #optimizer_latent_state = self.optimizer_latent.state_dict()
                     optimizer_mlp_state = self.optimizer_mlp.state_dict()
                     optimizer_triplane_state = self.optimizer_triplane.state_dict()
 
+                    self.results['best_triplane_codes'] = best_triplane_codes
                     np.save(os.path.join(self.run_dir, 'results.npy'), self.results)
+                    
                     torch.save(best_weights, os.path.join(self.run_dir, 'weights.pt'))
                     torch.save(optimizer_mlp_state, os.path.join(self.run_dir, 'optimizer_mlp_state.pt'))
                     torch.save(optimizer_triplane_state, os.path.join(self.run_dir, 'optimizer_triplane_state.pt'))
-                    #self.results['best_latent_codes'] = best_latent_codes
+                    
 
                 if self.train_cfg['lr_scheduler']:
                     #self.scheduler_model.step(avg_val_loss)
@@ -272,6 +288,7 @@ class Trainer():
 
     def train(self, train_loader, debug = False):
         total_loss = 0.0
+        total_loss_rec = 0.0
         iterations = 0.0
         
         log_interval = train_cfg['log_interval']
@@ -314,9 +331,13 @@ class Trainer():
             if self.train_cfg['clamp']:
                 sdf_gt = torch.clamp(sdf_gt, -self.train_cfg['clamp_value'], self.train_cfg['clamp_value'])
 
+            xy = self.triplane_codes['xy'][shape_ids]
+            yz = self.triplane_codes['yz'][shape_ids]
+            zx = self.triplane_codes['zx'][shape_ids]
+
 
             #predictions, attn_weights = self.model(coords=coords, shape_ids=shape_ids)
-            predictions = self.model(coords=coords, shape_ids=shape_ids, epoch=self.epoch)
+            predictions = self.model(coords=coords, xy_plane=xy, yz_plane=yz, zx_plane=zx, shape_ids=shape_ids, epoch=self.epoch)
             
             if torch.isnan(predictions).any():
                 print("NaN in model output (predictions)")
@@ -338,29 +359,29 @@ class Trainer():
             #loss_value, loss_rec, _ = self.train_cfg['loss_multiplier'] * SDFLoss_multishape(y, predictions, x[:, :self.train_cfg['latent_size']], sigma=self.train_cfg['sigma_regulariser'])
             loss_value, loss_rec, loss_reg = self.train_cfg['loss_multiplier'] * SDFLoss_triplane_multishape(
                 sdf_gt, predictions,
-                self.model.xy_planes[shape_ids],
-                self.model.yz_planes[shape_ids],
-                self.model.zx_planes[shape_ids],
+                xy,
+                yz, 
+                zx,
                 sigma=self.train_cfg['sigma_regulariser']
             )
 
             if (self.epoch + 1) % self.regularize_decorr_interval == 0 and self.epoch < self.regularize_until_epoch and self.epoch != self.train_cfg['epochs']-1:
-                xy = self.model.xy_planes[shape_ids]
-                yz = self.model.yz_planes[shape_ids]
-                zx = self.model.zx_planes[shape_ids]
+                #xy = self.model.xy_planes[shape_ids]
+                #yz = self.model.yz_planes[shape_ids]
+                #zx = self.model.zx_planes[shape_ids]
                 if xy.dim() != 4:
                     xy = xy.unsqueeze(0)
                     yz = yz.unsqueeze(0)
                     zx = zx.unsqueeze(0)
-                decorrelation_loss = triplane_decorrelation_loss(xy, yz, zx, num_subset_channels=16)
+                decorrelation_loss = triplane_decorrelation_loss(xy, yz, zx, num_subset_channels=8)
 
                 loss_value += self.lambda_decorr * decorrelation_loss
             
             
             if self.epoch % self.regularize_tv_interval == 0 and self.epoch < self.regularize_until_epoch and self.epoch != self.train_cfg['epochs']-1:
-                xy = self.model.xy_planes[shape_ids]
-                yz = self.model.yz_planes[shape_ids]
-                zx = self.model.zx_planes[shape_ids]
+                #xy = self.model.xy_planes[shape_ids]
+                #yz = self.model.yz_planes[shape_ids]
+                #zx = self.model.zx_planes[shape_ids]
                 if xy.dim() != 4:
                     xy = xy.unsqueeze(0)
                     yz = yz.unsqueeze(0)
@@ -406,16 +427,20 @@ class Trainer():
             self.optimizer_triplane.step()
 
             total_loss += loss_value.data.cpu().numpy()
+            total_loss_rec += loss_rec.data.cpu().numpy()
                 
             #self.writer.add_scalar("Attention/xy_mean", attn_weights[:, 0].mean().item(), self.epoch)
             #self.writer.add_scalar("Attention/yz_mean", attn_weights[:, 1].mean().item(), self.epoch)
             #self.writer.add_scalar("Attention/zx_mean", attn_weights[:, 2].mean().item(), self.epoch)
 
         avg_train_loss = total_loss/iterations
+        avg_train_loss_rec = total_loss_rec/iterations
         print(f'Training: loss {avg_train_loss}')
         self.writer.add_scalar('Training loss', avg_train_loss, self.epoch)
+        print(f'Training: loss_rec {avg_train_loss_rec}')
+        self.writer.add_scalar('Training loss_rec', avg_train_loss_rec, self.epoch)
 
-        return avg_train_loss
+        return avg_train_loss_rec #avg_train_loss
 
 
 
