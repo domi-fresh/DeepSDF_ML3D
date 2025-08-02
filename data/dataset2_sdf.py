@@ -51,8 +51,8 @@ class SDFDataset(Dataset):
         indices_pos = np.random.choice(num_pos, size=num_samples_from_pos, replace=False) 
         indices_neg = np.random.choice(num_neg, size=num_samples_from_neg, replace=False)
 
-        samples_latent_class = torch.concatenate((latent_class_pos[indices_pos], latent_class_neg[indices_neg]), dim=0).to(device) 
-        samples_sdf = torch.concatenate((sdf_pos[indices_pos], sdf_neg[indices_neg]), dim=0).to(device)
+        samples_latent_class = torch.cat((latent_class_pos[indices_pos], latent_class_neg[indices_neg]), dim=0).to(device) 
+        samples_sdf = torch.cat((sdf_pos[indices_pos], sdf_neg[indices_neg]), dim=0).to(device)
 
         return samples_latent_class, samples_sdf # [latent_shape_class, x, y, z], sdf shape (self.num_samples, 4), (self.num_samples,1)
 
