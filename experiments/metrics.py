@@ -68,7 +68,6 @@ def compute_trimesh_chamfer(gt_points, gen_mesh, num_mesh_samples=30000):
 def compute_mesh_accuracy(gt_points_cloud, gen_mesh, n_samples=30000, percentile=90):
     """
     Computes mesh accuracy as the 90th percentile distance from generated points to GT mesh.
-    This follows the DeepSDF and AtlasNet definition.
 
     Args:
         gt_points_cloud (trimesh.points.PointCloud): GT points (as trimesh PointCloud).

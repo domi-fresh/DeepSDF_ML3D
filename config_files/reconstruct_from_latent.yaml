@@ -1,6 +1,6 @@
 # Config file for reconstructing objects from latent code
 
-folder_sdf: '17_07_192805'   # Path containing training results, stored in results/runs_sdf, example: '14_05_2023'
-obj_ids: ['03001627/1aa07508b731af79814e2be0234da26c']   # List of object IDs to reconstruct from ShapeNetCore as category/instance, example: ['02942699/6d036fd1c70e5a5849493d905c02fa86'].
+folder_sdf: '20_07_140651'   # Path containing training results, stored in results/runs_sdf, example: '14_05_2023'
+obj_ids: ['03001627/11d9817e65d7ead6b87028a4b477349f']   # List of object IDs to reconstruct from ShapeNetCore as category/instance, example: ['02942699/6d036fd1c70e5a5849493d905c02fa86'].
 resolution: 256
 category_ids: ['03001627'] # List of category IDs to use fro reconstruction, can differ from obj_ids in test scenarios

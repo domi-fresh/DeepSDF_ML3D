@@ -8,11 +8,17 @@ import results
 import numpy as np
 import config_files
 import yaml
+import json
+import clip
+from model.clip_model import ClipObjEmbedder
+from pathlib import Path
+
 """Extract mesh from an already optimised latent code and network. 
 Store the mesh in the same folder where the latent code is located."""
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+PROJECT_ROOT = str(Path(__file__).parent.parent)
 
 def read_params(cfg):
     """Read the settings from the settings.yaml file. These are the settings used during training."""
@@ -24,13 +30,13 @@ def read_params(cfg):
     return training_settings
 
 
-def reconstruct_object(cfg, latent_code, obj_idx, model, coords_batches, grad_size_axis): 
+def reconstruct_object(cfg, embedding, latent_code, obj_idx, model, coords_batches, grad_size_axis): 
     """
     Reconstruct the object from the latent code and save the mesh.
     Meshes are stored as .obj files under the same folder cerated during training, for example:
     - runs_sdf/<datetime>/meshes_training/mesh_0.obj
     """
-    sdf = utils_deepsdf.predict_sdf(latent_code, coords_batches, model)
+    sdf = utils_deepsdf.predict_sdf(embedding, latent_code, coords_batches, model)
     try:
         vertices, faces = utils_deepsdf.extract_mesh(grad_size_axis, sdf)
     except:
@@ -51,11 +57,14 @@ def main(cfg):
     # Load the model
     weights = os.path.join("results/runs_sdf", cfg['folder_sdf'], 'weights.pt')
 
+    clipmodel = ClipObjEmbedder().to(device)
+
     model = sdf_model.SDFModel(
         num_layers=training_settings['num_layers'], 
         skip_connections=training_settings['latent_size'], 
         latent_size=training_settings['latent_size'], 
-        inner_dim=training_settings['inner_dim']).to(device)
+        inner_dim=training_settings['inner_dim']
+    ).to(device)
     model.load_state_dict(torch.load(weights, map_location=device))
    
     # Extract mesh obtained with the latent code optimised at inference
@@ -73,7 +82,7 @@ def main(cfg):
     str2int_dict = np.load(str2int_path, allow_pickle=True).item()
     results_dict = np.load(results_dict_path, allow_pickle=True).item()
 
-    for obj_id_path in cfg['obj_ids']:
+    for obj_id_path, category_id in zip(cfg['obj_ids'], cfg['category_ids']):
         # Get object index in the results dictionary
         obj_idx = str2int_dict[obj_id_path]  # index in collected latent vector
         print(obj_idx)
@@ -81,7 +90,16 @@ def main(cfg):
         latent_code = results_dict['best_latent_codes'][obj_idx]
         latent_code = torch.tensor(latent_code).to(device)
 
-        reconstruct_object(cfg, latent_code, obj_idx, model, coords_batches, grad_size_axis)
+        # Get the object id used for class label embeddings
+        #category_id = obj_id_path.split("/")[0]
+        with open(os.path.join(PROJECT_ROOT, "data/shape_info.json"), "r") as file:
+            category_id2label_dict = json.load(file)
+
+        category_label = category_id2label_dict[category_id]
+        with torch.no_grad():
+            category_embedding = clipmodel(clip.tokenize(category_label).to(device)).cpu()
+
+        reconstruct_object(cfg, category_embedding, latent_code, obj_idx, model, coords_batches, grad_size_axis)
 
 
 if __name__ == '__main__':

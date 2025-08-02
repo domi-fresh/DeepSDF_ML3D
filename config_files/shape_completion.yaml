@@ -1,18 +1,18 @@
 # Config file for reconstructing objects from latent code
 
-folder_sdf: '18_07_150021'   # Path containing training results, stored in results/runs_sdf, example: '14_05_2023'
-obj_ids: '03001627/1aa07508b731af79814e2be0234da26c'   # Object ID to reconstruct from ShapeNetCore as category/instance, example: ['02942699/6d036fd1c70e5a5849493d905c02fa86'].
+folder_sdf: '20_07_140651'   # Path containing training results, stored in results/runs_sdf, example: '14_05_2023'
+obj_ids: '03001627/11d9817e65d7ead6b87028a4b477349f'   # Object ID to reconstruct from ShapeNetCore as category/instance, example: ['02942699/6d036fd1c70e5a5849493d905c02fa86'].1aa07508b731af79814e2be0234da26c
 resolution: 256
-category_ids: '03001627' # can be different than in obj_ids
+category_ids: '04256520' # can be different than in obj_ids
 
 # Visible bounding box for shape completion
-x_axis_ratio_bbox: 1   # e.g. x_axis_ratio_bbox: 0.5, visible poincloud in half the object bounding box along the x-axis
+x_axis_ratio_bbox: 0.5   # e.g. x_axis_ratio_bbox: 0.5, visible poincloud in half the object bounding box along the x-axis
 y_axis_ratio_bbox: 1
-z_axis_ratio_bbox: 0.5
+z_axis_ratio_bbox: 1
 
 # Inference parameters
 epochs: 10000   # Number of epochs for latent code inference"
-lr: 0.00001   # Learning rate for latent code inference
+lr: 0.0001   # Learning rate for latent code inference
 lr_scheduler: True   
 lr_multiplier: 0.5   # Learning rate multiplier for the scheduler (if lr_scheduler: True)
 patience: 100   # Patience for latent code inference (if lr_scheduler: True)

@@ -24,7 +24,7 @@ PROJECT_ROOT = str(Path(__file__).parent.parent)
 def get_test_split(cfg):
     """Get paths to all objects used for benchmarking"""
 
-    shapenetcore_path = "/Users/benjaminkasper/Documents/Uni/RCI/Module/ml3dgeo/ShapeNetCore"
+    shapenetcore_path = ""
     obj_paths = []
     allowed_categories = cfg['category_ids']  # specific categories
 
@@ -171,7 +171,7 @@ def main(cfg):
             chamfer = compute_trimesh_chamfer(gt_pointcloud, output_mesh, num_mesh_samples=num_samples)
             mesh_acc = compute_mesh_accuracy(gt_pointcloud, output_mesh, n_samples=num_samples)
             emd = compute_trimesh_emd(gt_pointcloud, output_mesh, n_samples=500) # reduced bc very computationally expensive
-            print(chamfer, mesh_acc)
+            print(f"chamfer: {chamfer}, emd: {emd}, acc: {mesh_acc}")
             # save metrics to results:
             results_dict[obj_category_id]["chamfer"].append(chamfer)
             results_dict[obj_category_id]["mesh_acc"].append(mesh_acc)

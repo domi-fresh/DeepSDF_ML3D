@@ -66,15 +66,16 @@ def save_meshplot(vertices, faces, path):
     mp.plot(vertices, faces, c=vertices[:, 2], filename=path)
 
 
-def predict_sdf(latent, coords_batches, model):
+def predict_sdf(embedding, latent, coords_batches, model): # Added class embedding 
 
     sdf = torch.tensor([], dtype=torch.float32).view(0, 1).to(device)
 
     model.eval()
     with torch.no_grad():
         for coords in coords_batches:
-            latent_tile = torch.tile(latent, (coords.shape[0], 1))
-            coords_latent = torch.hstack((latent_tile, coords))
+            n_points = coords.shape[0]
+            latent_tile = torch.tile(latent, (n_points, 1)) # new axis and repeat along axis
+            coords_latent = torch.hstack((embedding.tile(n_points, 1), latent_tile, coords))
             sdf_batch = model(coords_latent)
             sdf = torch.vstack((sdf, sdf_batch))        
 
