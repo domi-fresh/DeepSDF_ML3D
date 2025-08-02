@@ -10,3 +10,7 @@ __pycache__/
 .DS_Store
 deepsdf.egg-info
 jobs/
+experiments/*
+!experiments/calc_metrics.py
+!experiments/metrics.py
+
