@@ -18,9 +18,6 @@ class SDFModel(torch.nn.Module):
         """
         super(SDFModel, self).__init__()
 
-        # CLIP Label Embedder dimension
-        self.dim_embedding = 512
-
         # Num layers of the entire network
         self.num_layers = num_layers 
 
@@ -31,10 +28,10 @@ class SDFModel(torch.nn.Module):
 
         # Dimension of the input space (3D coordinates)
         dim_coords = 3 
-        input_dim = self.latent_size + dim_coords + self.dim_embedding
+        input_dim = self.latent_size + dim_coords
 
         # Copy input size to calculate the skip tensor size
-        self.skip_tensor_dim = copy.copy(self.latent_size + dim_coords)
+        self.skip_tensor_dim = copy.copy(input_dim)
 
         # Compute how many layers are not Sequential
         num_extra_layers = 2 if (self.skip_connections and self.num_layers >= 8) else 1
@@ -57,7 +54,7 @@ class SDFModel(torch.nn.Module):
         Returns:
             sdf: output tensor of shape (batch_size, 1)
         """      
-        input_latent_coords = x[:, self.dim_embedding:].clone().detach() # get latent + coord part of input vector for skip connections
+        input_latent_coords = x # get latent + coord part of input vector for skip connections
 
         # Forward pass
         if self.skip_connections and self.num_layers >= 5:
@@ -76,12 +73,9 @@ class SDFModel(torch.nn.Module):
         return sdf
 
 
-    def infer_latent_code(self, cfg, pointcloud, sdf_gt, writer, latent_code_initial, class_emb):
-        """Infer latent code from coordinates, their sdf, and a trained model.
+    def infer_latent_code(self, cfg, pointcloud, sdf_gt, writer, latent_code_initial):
+        """Infer latent code from coordinates, their sdf, and a trained model."""
         
-        Args:
-            class_emb: input tensor of shape (512,)
-        """
         latent_code = latent_code_initial.clone().detach().requires_grad_(True)
         
         optim = torch.optim.Adam([latent_code], lr=cfg['lr'])
@@ -101,7 +95,7 @@ class SDFModel(torch.nn.Module):
             
             n_pts = pointcloud.shape[0]
             latent_code_tile = torch.tile(latent_code, (n_pts, 1)) # (128,) --> (n_pts, 128) (tile automatically unsqueezes)
-            x = torch.hstack((class_emb.tile(n_pts, 1), latent_code_tile, pointcloud)) # column-wise stacking (n_pts, 512 + 128 + 3)
+            x = torch.hstack((latent_code_tile, pointcloud)) # column-wise stacking (n_pts, 512 + 128 + 3)
 
             optim.zero_grad()
 
@@ -110,7 +104,7 @@ class SDFModel(torch.nn.Module):
             if cfg['clamp']:
                 predictions = torch.clamp(predictions, -cfg['clamp_value'], cfg['clamp_value'])
 
-            loss_value, l1, l2 = utils_deepsdf.SDFLoss_multishape(sdf_gt, predictions, x[:, self.dim_embedding:(self.dim_embedding+self.latent_size)], sigma=cfg['sigma_regulariser'])
+            loss_value, l1, l2 = utils_deepsdf.SDFLoss_multishape(sdf_gt, predictions, x[:,:self.latent_size], sigma=cfg['sigma_regulariser'])
             loss_value.backward()
 
             if writer is not None:

@@ -7,20 +7,14 @@ from results import runs_sdf
 import numpy as np
 import config_files
 import yaml
-import data.ShapeNetCoreV2 as ShapeNetCoreV2
 from utils import utils_mesh
-import pybullet as pb
 from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
-from model.clip_model import ClipObjEmbedder
-import clip
-import json
 from pathlib import Path
 """Infer and reconstruct mesh from a partial point cloud.
 Store the mesh in the same folder where the latent code is located."""
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 PROJECT_ROOT = str(Path(__file__).parent.parent)
 
 def read_params(cfg):
@@ -32,13 +26,13 @@ def read_params(cfg):
     return training_settings
 
 
-def reconstruct_object(cfg, label_embedding, latent_code, obj_idx, model, coords_batches, grad_size_axis): 
+def reconstruct_object(cfg, latent_code, obj_idx, model, coords_batches, grad_size_axis): 
     """
     Reconstruct the object from the latent code and save the mesh.
     Meshes are stored as .obj files under the same folder cerated during training, for example:
     - runs_sdf/<datetime>/meshes_training/mesh_0.obj
     """
-    sdf = utils_deepsdf.predict_sdf(label_embedding, latent_code, coords_batches, model)
+    sdf = utils_deepsdf.predict_sdf(latent_code, coords_batches, model)
     try:
         vertices, faces = utils_deepsdf.extract_mesh(grad_size_axis, sdf)
     except:
@@ -61,16 +55,16 @@ def generate_partial_pointcloud(cfg):
         samples: np.array, shape (N, 3), where N is the number of points in the partial point cloud.
         """
     # Load mesh
-    obj_path = os.path.join("/Users/benjaminkasper/Documents/Uni/RCI/Module/ml3dgeo/ShapeNetCore", cfg['obj_ids'], 'models', 'model_normalized.obj')
+    obj_path = os.path.join(".../ShapeNetCore", cfg['obj_ids'], 'models', 'model_normalized.obj')
     mesh_original = utils_mesh._as_mesh(trimesh.load(obj_path))
 
     # In Shapenet, the front is the -Z axis with +Y still being the up axis. 
     # Rotate objects to align with the canonical axis. 
-    #mesh = utils_mesh.shapenet_rotate(mesh_original) # we rm that
+    #mesh = utils_mesh.shapenet_rotate(mesh_original)
     mesh = mesh_original
 
     # Sample on the object surface
-    samples = np.array(trimesh.sample.sample_surface(mesh, 20000)[0]) # only sampling on surface --> bad
+    samples = np.array(trimesh.sample.sample_surface(mesh, 10000)[0])
 
     # Infer object bounding box and collect samples on the surface of the objects when the x-axis is lower than a certain threshold t.
     # This is to simulate a partial point cloud.
@@ -132,25 +126,15 @@ def main(cfg):
     results_path = os.path.join(model_dir, 'results.npy')
     results = np.load(results_path, allow_pickle=True).item()
     latent_code = results['best_latent_codes']
-    # Get average latent code (across dimensions) 
+    # Get average latent code (across dimensions)
     latent_code = torch.mean(torch.tensor(latent_code, dtype=torch.float32), dim=0).to(device)
     latent_code.requires_grad = True
     
-    # ============== MOD 1 ==============
-    with open(os.path.join(PROJECT_ROOT, "data/shape_info.json"), "r") as file:
-        category_id2label_dict = json.load(file)
-
-    category_label = category_id2label_dict[cfg['category_ids']]
-    clipmodel = ClipObjEmbedder().to(device)
-    with torch.no_grad():
-        category_embedding = clipmodel(clip.tokenize(category_label).to(device))
-
-
     # Infer latent code
-    best_latent_code = model.infer_latent_code(cfg, pointcloud, sdf_gt, writer, latent_code, category_embedding)
+    best_latent_code = model.infer_latent_code(cfg, pointcloud, sdf_gt, writer, latent_code)
 
     # Extract mesh obtained with the latent code optimised at inference
-    sdf = utils_deepsdf.predict_sdf(category_embedding, best_latent_code, coords_batches, model)
+    sdf = utils_deepsdf.predict_sdf(best_latent_code, coords_batches, model)
     vertices, faces = utils_deepsdf.extract_mesh(grad_size_axis, sdf)
     output_mesh = utils_mesh._as_mesh(trimesh.Trimesh(vertices, faces))
 

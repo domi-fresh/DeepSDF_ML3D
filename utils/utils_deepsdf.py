@@ -30,22 +30,19 @@ def SDFLoss_multishape(sdf, prediction, x_latent, sigma):
 
 
 def generate_latent_codes(latent_size, samples_dict):
-    """Generate a random latent codes for each shape form a Gaussian distribution
-    Returns:
-        - latent_codes: np.array, shape (num_shapes, latent_size)
-        - dict_latent_codes: key: obj_index, value: corresponding idx in the latent_codes array. 
-                                  e.g.  latent_codes = ([ [1, 2, 3], [7, 8, 9] ])
-                                        dict_latent_codes[345] = 0, the obj that has index 345 refers to 
-                                        the 0-th latent code.
     """
-    latent_codes = torch.tensor([], dtype=torch.float32).reshape(0, latent_size).to(device)
-    #dict_latent_codes = dict()
-    for i, obj_idx in enumerate(list(samples_dict.keys())):
-        #dict_latent_codes[obj_idx] = i
-        latent_code = torch.normal(0, 0.01, size = (1, latent_size), dtype=torch.float32).to(device)
-        latent_codes = torch.vstack((latent_codes, latent_code))
-    latent_codes.requires_grad_(True)
-    return latent_codes #, dict_latent_codes
+    Generate a trainable latent code (as torch.nn.Parameter) for each shape from a Gaussian distribution.
+    Returns:
+        - latent_codes: torch.nn.Parameter of shape (num_shapes, latent_size)
+    """
+    latent_code_list = []
+    for _ in samples_dict.keys():
+        latent_code = torch.normal(0, 0.01, size=(1, latent_size), dtype=torch.float32).to(device)
+        latent_code_list.append(latent_code)
+
+    latent_codes_tensor = torch.vstack(latent_code_list)  # shape: (num_shapes, latent_size)
+    latent_codes = torch.nn.Parameter(latent_codes_tensor)  # make trainable
+    return latent_codes
 
 
 def get_volume_coords(resolution = 50):
@@ -66,7 +63,7 @@ def save_meshplot(vertices, faces, path):
     mp.plot(vertices, faces, c=vertices[:, 2], filename=path)
 
 
-def predict_sdf(embedding, latent, coords_batches, model): # Added class embedding 
+def predict_sdf(latent, coords_batches, model):
 
     sdf = torch.tensor([], dtype=torch.float32).view(0, 1).to(device)
 
@@ -75,7 +72,7 @@ def predict_sdf(embedding, latent, coords_batches, model): # Added class embeddi
         for coords in coords_batches:
             n_points = coords.shape[0]
             latent_tile = torch.tile(latent, (n_points, 1)) # new axis and repeat along axis
-            coords_latent = torch.hstack((embedding.tile(n_points, 1), latent_tile, coords))
+            coords_latent = torch.hstack((latent_tile, coords))
             sdf_batch = model(coords_latent)
             sdf = torch.vstack((sdf, sdf_batch))        
 

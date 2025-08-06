@@ -1,5 +1,6 @@
 import torch
 import model.model_sdf as sdf_model
+#import model.model_siren as sdf_model
 import torch.optim as optim
 import data.dataset2_sdf as dataset
 from torch.utils.data import random_split
@@ -18,12 +19,6 @@ import config_files
 from pathlib import Path
 import time
 
-# ================== MODIFICATION 1 (can be removed) ==================
-from model.clip_model import ClipObjEmbedder
-import clip
-import json
-# =====================================================================
-
 # Select device. The 'mps' device (macOS M1 architecture) is not supported as it cannot currently handle weith normalisation. 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Device: {device}')
@@ -40,6 +35,8 @@ class Trainer():
         self.run_dir = os.path.join(self.runs_dir, self.timestamp_run)  # directory for this run
         if not os.path.exists(self.run_dir):
             os.makedirs(self.run_dir)
+
+        self.criterion = torch.nn.L1Loss().to(device)
         
         # Logging
         self.writer = SummaryWriter(log_dir=self.run_dir)
@@ -50,10 +47,6 @@ class Trainer():
         # calculate num objects in samples_dictionary, wich is the number of keys
         samples_dict_path = os.path.join(os.path.dirname(results.__file__), f'samples_dict_{train_cfg["dataset"]}.npy')
         samples_dict = np.load(samples_dict_path, allow_pickle=True).item()
-
-        # instantiate clip model for class label embeddings
-        self.clip = ClipObjEmbedder().to(device)
-        print("Loaded CLIP")
 
         # instantiate model and optimisers
         self.model = sdf_model.SDFModel(
@@ -69,33 +62,6 @@ class Trainer():
         # generate a unique random latent code for each shape
         self.latent_codes = utils_deepsdf.generate_latent_codes(self.train_cfg['latent_size'], samples_dict)
         self.optimizer_latent = optim.Adam([self.latent_codes], lr=self.train_cfg['lr_latent'], weight_decay=0)
-
-        # ================== MODIFICATION 1 (can be removed) ==================
-        categories_dict_path = os.path.join(PROJECT_ROOT, "data/", "shape_info.json")
-        with open(categories_dict_path, "r") as file:
-            categories_dict = json.load(file)
-
-        category_names = list(categories_dict.values())
-        category_ids = list(categories_dict.keys())
-
-        category_label_token = clip.tokenize(category_names).to(device) # (n_categories, 77)
-        with torch.no_grad():
-            category_label_embedding = self.clip(category_label_token) # shape (n_categories, 512)
-
-        label_embeddings = {category_id: category_label_embedding[i] for i, category_id in enumerate(category_ids)}
-        print("Computed embedding for every category based on it's label")
-        idx_int2str_dict_path = os.path.join(PROJECT_ROOT, "results/idx_int2str_dict.npy")
-        idx_int2str_dict = np.load(idx_int2str_dict_path, allow_pickle=True).item()
-
-        self.idx_int2_labelemb = torch.empty(len(idx_int2str_dict.keys()), 512)
-
-        for key in idx_int2str_dict.keys():
-            category_id = idx_int2str_dict[key].split("/")[0]
-            category_label_emb = label_embeddings[category_id] # label emb as tensor            
-            self.idx_int2_labelemb[key,:] = category_label_emb # fill in lookup tensor
-
-        self.idx_int2_labelemb = self.idx_int2_labelemb.to(device)
-        # =====================================================================
         
         # Load pretrained weights and optimisers to continue training
         if self.train_cfg['pretrained']:
@@ -125,7 +91,7 @@ class Trainer():
             'best_latent_codes' : []
         }
 
-        best_loss = 10000000000
+        best_loss = torch.inf
         start = time.time()
         for epoch in range(self.train_cfg['epochs']):
             print(f'============================ Epoch {epoch} ============================')
@@ -133,28 +99,29 @@ class Trainer():
 
             avg_train_loss = self.train(train_loader)
 
+            # has no effect since all data is used in train loader (validation spit does not exist in original paper)
             with torch.no_grad():
                 avg_val_loss = self.validate(val_loader)
 
-                if avg_train_loss < best_loss:
-                    best_loss = np.copy(avg_train_loss)
-                    best_weights = self.model.state_dict()
-                    best_latent_codes = self.latent_codes.detach().cpu().numpy()
-                    optimizer_model_state = self.optimizer_model.state_dict()
-                    optimizer_latent_state = self.optimizer_latent.state_dict()
+            if avg_train_loss < best_loss:
+                best_loss = np.copy(avg_train_loss)
+                best_weights = self.model.state_dict()
+                best_latent_codes = self.latent_codes.detach().cpu().numpy()
+                optimizer_model_state = self.optimizer_model.state_dict()
+                optimizer_latent_state = self.optimizer_latent.state_dict()
 
-                    np.save(os.path.join(self.run_dir, 'results.npy'), self.results)
-                    torch.save(best_weights, os.path.join(self.run_dir, 'weights.pt'))
-                    torch.save(optimizer_model_state, os.path.join(self.run_dir, 'optimizer_model_state.pt'))
-                    torch.save(optimizer_latent_state, os.path.join(self.run_dir, 'optimizer_latent_state.pt'))
-                    self.results['best_latent_codes'] = best_latent_codes
+                np.save(os.path.join(self.run_dir, 'results.npy'), self.results)
+                torch.save(best_weights, os.path.join(self.run_dir, 'weights.pt'))
+                torch.save(optimizer_model_state, os.path.join(self.run_dir, 'optimizer_model_state.pt'))
+                torch.save(optimizer_latent_state, os.path.join(self.run_dir, 'optimizer_latent_state.pt'))
+                self.results['best_latent_codes'] = best_latent_codes
 
-                if self.train_cfg['lr_scheduler']:
-                    self.scheduler_model.step(avg_train_loss)
-                    self.scheduler_latent.step(avg_train_loss)
+            if self.train_cfg['lr_scheduler']:
+                self.scheduler_model.step(avg_train_loss)
+                self.scheduler_latent.step(avg_train_loss)
 
-                    self.writer.add_scalar('Learning rate (model)', self.scheduler_model._last_lr[0], epoch)
-                    self.writer.add_scalar('Learning rate (latent)', self.scheduler_latent._last_lr[0], epoch)            
+                self.writer.add_scalar('Learning rate (model)', self.scheduler_model._last_lr[0], epoch)
+                self.writer.add_scalar('Learning rate (latent)', self.scheduler_latent._last_lr[0], epoch)            
             
         end = time.time()
         print(f'Time elapsed: {end - start} s')
@@ -188,7 +155,7 @@ class Trainer():
                 shuffle=True,
                 drop_last=True
             )
-        val_loader = DataLoader(
+        val_loader = DataLoader( # exists, but all samples from validation are in train too (validation is not in original paper)
             val_data,
             batch_size=self.train_cfg['batch_size'],
             shuffle=False,
@@ -218,11 +185,7 @@ class Trainer():
         #coords = batch[0][:, 1:] # shape (batch_size, 3)
         #latent_codes_batch = self.latent_codes[latent_classes_batch.view(-1)] # shape (batch_size, 128) # use latent_class 
 
-        # ================== MODIFICATION 1 (can be removed) ==================
-        label_emb_batch = self.idx_int2_labelemb[latent_classes_batch.view(-1)] # shape (batch_size*num_samples, 512)
-        # =====================================================================
-
-        x = torch.hstack((label_emb_batch, latent_codes_batch, coords)).to(device) # shape (batch_size*num_sanples, 512 + 128 + 3)
+        x = torch.hstack((latent_codes_batch, coords)).to(device) # shape (batch_size*num_sanples, 128 + 3)
         y = batch[1].view(-1,1).to(device) # (batch_size*num_samples, 1)
 
         return x, y, latent_classes_batch.view(-1), latent_codes_batch
@@ -232,9 +195,7 @@ class Trainer():
         iterations = 0.0
         self.model.train()
         for i, batch in enumerate(train_loader):
-            # batch[0]: [class, x, y, z], shape: (batch_size, 4)
-            # batch[1]: [sdf], shape: (batch size)
-            # batch[2]: [token], shape (77,)
+
             iterations += 1.0
 
             self.optimizer_model.zero_grad()
@@ -249,7 +210,8 @@ class Trainer():
             if self.train_cfg['clamp']:
                 predictions = torch.clamp(predictions, -self.train_cfg['clamp_value'], self.train_cfg['clamp_value'])
            
-            loss_value, loss_rec, loss_latent = self.train_cfg['loss_multiplier'] * SDFLoss_multishape(y, predictions, x[:, 512:(512 + self.train_cfg['latent_size'])], sigma=self.train_cfg['sigma_regulariser'])
+            loss_value, loss_rec, loss_latent = self.train_cfg['loss_multiplier'] * SDFLoss_multishape(y, predictions, x[:, :self.train_cfg['latent_size']], sigma=self.train_cfg['sigma_regulariser'])
+
             loss_value.backward()     
 
             if (i+1) % 500 == 0:
@@ -284,17 +246,17 @@ class Trainer():
                 predictions = torch.clamp(predictions, -train_cfg['clamp_value'], train_cfg['clamp_value'])
 
             loss_value, loss_rec, loss_latent = self.train_cfg['loss_multiplier'] * SDFLoss_multishape(y, predictions, latent_codes_batch, self.train_cfg['sigma_regulariser'])          
-            total_loss += loss_value.data.cpu().numpy()   
-            total_loss_rec += loss_rec.data.cpu().numpy() 
-            total_loss_latent += loss_latent.data.cpu().numpy()
+            total_loss += loss_value.item() # .item() is faster
+            total_loss_rec += loss_rec.item() 
+            total_loss_latent += loss_latent.item()
 
         avg_val_loss = total_loss/iterations
         avg_loss_rec = total_loss_rec/iterations
         avg_loss_latent = total_loss_latent/iterations
         print(f'Validation: loss {avg_val_loss}')
-        self.writer.add_scalar('Validation loss', avg_val_loss, self.epoch)
-        self.writer.add_scalar('Reconstruction loss', avg_loss_rec, self.epoch)
-        self.writer.add_scalar('Latent code loss', avg_loss_latent, self.epoch)
+        #self.writer.add_scalar('Validation loss', avg_val_loss, self.epoch) irrelevant
+        #self.writer.add_scalar('Reconstruction loss', avg_loss_rec, self.epoch) irrelevant
+        #self.writer.add_scalar('Latent code loss', avg_loss_latent, self.epoch) irrelevant
 
         return avg_val_loss
 

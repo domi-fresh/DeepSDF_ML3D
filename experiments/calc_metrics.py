@@ -3,6 +3,7 @@ from metrics import compute_trimesh_chamfer, compute_mesh_accuracy, compute_trim
 import torch
 import os
 import model.model_sdf as sdf_model
+#import model.model_siren as sdf_model
 from utils import utils_deepsdf
 import trimesh
 import numpy as np
@@ -11,7 +12,6 @@ from utils import utils_mesh
 from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
 from model.clip_model import ClipObjEmbedder
-import clip
 import json
 from pathlib import Path
 from glob import glob
@@ -24,7 +24,7 @@ PROJECT_ROOT = str(Path(__file__).parent.parent)
 def get_test_split(cfg):
     """Get paths to all objects used for benchmarking"""
 
-    shapenetcore_path = ""
+    shapenetcore_path = "/cluster/54/bkasper/ShapeNetCore"
     obj_paths = []
     allowed_categories = cfg['category_ids']  # specific categories
 
@@ -97,12 +97,6 @@ def main(cfg):
         inner_dim=model_settings['inner_dim']).to(device)
     model.load_state_dict(torch.load(weights, map_location=device))
 
-    # =============================== MOD 1 ===============================
-    with open(os.path.join(PROJECT_ROOT, "data/shape_info.json"), "r") as file:
-        category_id2label_dict = json.load(file)
-    clipmodel = ClipObjEmbedder().to(device)
-    # ======================================================================
-
     # Path and json to save results to
     results_dict_path = os.path.join(PROJECT_ROOT, f"experiments/results_{datetime.now().strftime('%d_%m_%H%M%S')}.json")
     results_dict = {
@@ -148,18 +142,12 @@ def main(cfg):
         # Get average latent code (across dimensions) 
         latent_code = torch.mean(torch.tensor(latent_code, dtype=torch.float32), dim=0).to(device)
         latent_code.requires_grad = True
-    
-        # =============================== MOD 1 ===============================
-        with torch.no_grad():
-            category_label = category_id2label_dict[obj_category_id]
-            category_embedding = clipmodel(clip.tokenize(category_label).to(device))
-        # ======================================================================
 
         # Infer latent code
-        best_latent_code = model.infer_latent_code(cfg, pointcloud, sdf_gt, writer, latent_code, category_embedding)
+        best_latent_code = model.infer_latent_code(cfg, pointcloud, sdf_gt, writer, latent_code)
 
         # Extract mesh obtained with the latent code optimised at inference
-        sdf = utils_deepsdf.predict_sdf(category_embedding, best_latent_code, coords_batches, model)
+        sdf = utils_deepsdf.predict_sdf(best_latent_code, coords_batches, model)
         
         try:
             vertices, faces = utils_deepsdf.extract_mesh(grad_size_axis, sdf)
@@ -171,7 +159,7 @@ def main(cfg):
             chamfer = compute_trimesh_chamfer(gt_pointcloud, output_mesh, num_mesh_samples=num_samples)
             mesh_acc = compute_mesh_accuracy(gt_pointcloud, output_mesh, n_samples=num_samples)
             emd = compute_trimesh_emd(gt_pointcloud, output_mesh, n_samples=500) # reduced bc very computationally expensive
-            print(f"chamfer: {chamfer}, emd: {emd}, acc: {mesh_acc}")
+            print(chamfer, mesh_acc)
             # save metrics to results:
             results_dict[obj_category_id]["chamfer"].append(chamfer)
             results_dict[obj_category_id]["mesh_acc"].append(mesh_acc)
