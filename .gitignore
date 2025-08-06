@@ -13,4 +13,5 @@ jobs/
 experiments/*
 !experiments/calc_metrics.py
 !experiments/metrics.py
+!experiments/evaluate.py
 

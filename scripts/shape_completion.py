@@ -70,7 +70,7 @@ def generate_partial_pointcloud(cfg):
     mesh = mesh_original
 
     # Sample on the object surface
-    samples = np.array(trimesh.sample.sample_surface(mesh, 10000)[0]) # only sampling on surface --> bad
+    samples = np.array(trimesh.sample.sample_surface(mesh, 20000)[0]) # only sampling on surface --> bad
 
     # Infer object bounding box and collect samples on the surface of the objects when the x-axis is lower than a certain threshold t.
     # This is to simulate a partial point cloud.
